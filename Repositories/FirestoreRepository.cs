@@ -1,0 +1,206 @@
+using Google.Cloud.Firestore;
+using API_DigiBook.Services;
+using System.Linq.Expressions;
+
+namespace API_DigiBook.Repositories
+{
+    /// <summary>
+    /// Base repository implementation for Firestore
+    /// </summary>
+    /// <typeparam name="T">Entity type with [FirestoreData] attribute</typeparam>
+    public class FirestoreRepository<T> : IRepository<T> where T : class
+    {
+        protected readonly FirestoreDb _db;
+        protected readonly string _collectionName;
+        protected readonly ILogger? _logger;
+
+        public FirestoreRepository(string collectionName, ILogger? logger = null)
+        {
+            _db = FirebaseService.GetFirestoreDb();
+            _collectionName = collectionName;
+            _logger = logger;
+        }
+
+        public virtual async Task<IEnumerable<T>> GetAllAsync()
+        {
+            try
+            {
+                var snapshot = await _db.Collection(_collectionName).GetSnapshotAsync();
+                var items = new List<T>();
+
+                foreach (var document in snapshot.Documents)
+                {
+                    if (document.Exists)
+                    {
+                        var item = document.ConvertTo<T>();
+                        items.Add(item);
+                    }
+                }
+
+                return items;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error getting all documents from {Collection}", _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<T?> GetByIdAsync(string id)
+        {
+            try
+            {
+                var docRef = _db.Collection(_collectionName).Document(id);
+                var snapshot = await docRef.GetSnapshotAsync();
+
+                if (!snapshot.Exists)
+                {
+                    return null;
+                }
+
+                return snapshot.ConvertTo<T>();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error getting document {Id} from {Collection}", id, _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<string> AddAsync(T entity, string? customId = null)
+        {
+            try
+            {
+                var collectionRef = _db.Collection(_collectionName);
+
+                if (!string.IsNullOrEmpty(customId))
+                {
+                    var docRef = collectionRef.Document(customId);
+                    await docRef.SetAsync(entity);
+                    return customId;
+                }
+                else
+                {
+                    var docRef = await collectionRef.AddAsync(entity);
+                    return docRef.Id;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error adding document to {Collection}", _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<bool> UpdateAsync(string id, T entity)
+        {
+            try
+            {
+                var docRef = _db.Collection(_collectionName).Document(id);
+                var snapshot = await docRef.GetSnapshotAsync();
+
+                if (!snapshot.Exists)
+                {
+                    return false;
+                }
+
+                await docRef.SetAsync(entity, SetOptions.MergeAll);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error updating document {Id} in {Collection}", id, _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<bool> UpdateFieldsAsync(string id, Dictionary<string, object> updates)
+        {
+            try
+            {
+                var docRef = _db.Collection(_collectionName).Document(id);
+                var snapshot = await docRef.GetSnapshotAsync();
+
+                if (!snapshot.Exists)
+                {
+                    return false;
+                }
+
+                await docRef.UpdateAsync(updates);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error updating fields in document {Id} in {Collection}", id, _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<bool> DeleteAsync(string id)
+        {
+            try
+            {
+                var docRef = _db.Collection(_collectionName).Document(id);
+                var snapshot = await docRef.GetSnapshotAsync();
+
+                if (!snapshot.Exists)
+                {
+                    return false;
+                }
+
+                await docRef.DeleteAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error deleting document {Id} from {Collection}", id, _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<bool> ExistsAsync(string id)
+        {
+            try
+            {
+                var docRef = _db.Collection(_collectionName).Document(id);
+                var snapshot = await docRef.GetSnapshotAsync();
+                return snapshot.Exists;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error checking existence of document {Id} in {Collection}", id, _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<int> CountAsync()
+        {
+            try
+            {
+                var snapshot = await _db.Collection(_collectionName).GetSnapshotAsync();
+                return snapshot.Count;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error counting documents in {Collection}", _collectionName);
+                throw;
+            }
+        }
+
+        public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate)
+        {
+            try
+            {
+                // Note: Expression-based queries are limited in Firestore
+                // For complex queries, override this method in specific repositories
+                var allItems = await GetAllAsync();
+                return allItems.Where(predicate.Compile());
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error finding documents in {Collection}", _collectionName);
+                throw;
+            }
+        }
+    }
+}

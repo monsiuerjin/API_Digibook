@@ -1,0 +1,211 @@
+using Microsoft.AspNetCore.Mvc;
+using API_DigiBook.Models;
+using API_DigiBook.Repositories;
+
+namespace API_DigiBook.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class CategoriesController : ControllerBase
+    {
+        private readonly ICategoryRepository _categoryRepository;
+        private readonly ILogger<CategoriesController> _logger;
+
+        public CategoriesController(ICategoryRepository categoryRepository, ILogger<CategoriesController> logger)
+        {
+            _categoryRepository = categoryRepository;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Get all categories
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetAllCategories()
+        {
+            try
+            {
+                var categories = await _categoryRepository.GetAllAsync();
+                
+                return Ok(new
+                {
+                    success = true,
+                    count = categories.Count(),
+                    data = categories
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting categories");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving categories",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get category by name (Document ID)
+        /// </summary>
+        [HttpGet("{name}")]
+        public async Task<IActionResult> GetCategoryByName(string name)
+        {
+            try
+            {
+                var category = await _categoryRepository.GetByNameAsync(name);
+
+                if (category == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Category '{name}' not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = category
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting category: {Name}", name);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving category",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Create a new category
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> CreateCategory([FromBody] Category category)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(category.Name))
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Category name is required"
+                    });
+                }
+
+                // Check if category already exists
+                var exists = await _categoryRepository.ExistsAsync(category.Name);
+                if (exists)
+                {
+                    return Conflict(new
+                    {
+                        success = false,
+                        message = $"Category '{category.Name}' already exists"
+                    });
+                }
+
+                // Use name as document ID
+                await _categoryRepository.AddAsync(category, category.Name);
+
+                return CreatedAtAction(nameof(GetCategoryByName), new { name = category.Name }, new
+                {
+                    success = true,
+                    message = "Category created successfully",
+                    data = category
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating category");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error creating category",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Update an existing category
+        /// </summary>
+        [HttpPut("{name}")]
+        public async Task<IActionResult> UpdateCategory(string name, [FromBody] Category category)
+        {
+            try
+            {
+                var updated = await _categoryRepository.UpdateAsync(name, category);
+
+                if (!updated)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Category '{name}' not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Category updated successfully",
+                    data = category
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating category: {Name}", name);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error updating category",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Delete a category
+        /// </summary>
+        [HttpDelete("{name}")]
+        public async Task<IActionResult> DeleteCategory(string name)
+        {
+            try
+            {
+                var deleted = await _categoryRepository.DeleteAsync(name);
+
+                if (!deleted)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Category '{name}' not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Category deleted successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting category: {Name}", name);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error deleting category",
+                    error = ex.Message
+                });
+            }
+        }
+    }
+}
