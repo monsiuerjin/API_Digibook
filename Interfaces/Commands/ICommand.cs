@@ -1,4 +1,4 @@
-namespace API_DigiBook.Commands
+namespace API_DigiBook.Interfaces.Commands
 {
     /// <summary>
     /// Interface for Command Pattern

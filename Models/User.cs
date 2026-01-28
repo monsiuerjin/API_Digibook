@@ -17,8 +17,8 @@ namespace API_DigiBook.Models
         [FirestoreProperty("phone")]
         public string Phone { get; set; } = string.Empty;
 
-        [FirestoreProperty("address")]
-        public string Address { get; set; } = string.Empty;
+        [FirestoreProperty("addresses")]
+        public List<Address> Addresses { get; set; } = new List<Address>();
 
         [FirestoreProperty("avatar")]
         public string Avatar { get; set; } = string.Empty;
@@ -38,10 +38,35 @@ namespace API_DigiBook.Models
         [FirestoreProperty("status")]
         public string Status { get; set; } = "active";
 
+        [FirestoreProperty("wishlistIds")]
+        public List<string> WishlistIds { get; set; } = new List<string>();
+
         [FirestoreProperty("createdAt")]
         public Timestamp CreatedAt { get; set; }
 
         [FirestoreProperty("updatedAt")]
         public Timestamp UpdatedAt { get; set; }
+    }
+
+    [FirestoreData]
+    public class Address
+    {
+        [FirestoreProperty("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [FirestoreProperty("label")]
+        public string Label { get; set; } = string.Empty;
+
+        [FirestoreProperty("recipientName")]
+        public string RecipientName { get; set; } = string.Empty;
+
+        [FirestoreProperty("phone")]
+        public string Phone { get; set; } = string.Empty;
+
+        [FirestoreProperty("fullAddress")]
+        public string FullAddress { get; set; } = string.Empty;
+
+        [FirestoreProperty("isDefault")]
+        public bool IsDefault { get; set; } = false;
     }
 }

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using API_DigiBook.Services;
+using API_DigiBook.Singleton;
 
 namespace API_DigiBook.Controllers
 {

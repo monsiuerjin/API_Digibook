@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using API_DigiBook.Models;
-using API_DigiBook.Services.Discount;
-using API_DigiBook.Services;
+using API_DigiBook.Interfaces.Services;
+using API_DigiBook.Decorator;
+using API_DigiBook.Decorator.Decorators;
+using API_DigiBook.Singleton;
 
 namespace API_DigiBook.Controllers
 {

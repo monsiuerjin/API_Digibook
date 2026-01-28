@@ -36,13 +36,13 @@ namespace API_DigiBook
             builder.Services.AddControllers();
             
             // Register Repositories
-            builder.Services.AddScoped<API_DigiBook.Repositories.IBookRepository, API_DigiBook.Repositories.BookRepository>();
-            builder.Services.AddScoped<API_DigiBook.Repositories.ICategoryRepository, API_DigiBook.Repositories.CategoryRepository>();
-            builder.Services.AddScoped<API_DigiBook.Repositories.IAuthorRepository, API_DigiBook.Repositories.AuthorRepository>();
-            builder.Services.AddScoped<API_DigiBook.Repositories.IUserRepository, API_DigiBook.Repositories.UserRepository>();
-            builder.Services.AddScoped<API_DigiBook.Repositories.IOrderRepository, API_DigiBook.Repositories.OrderRepository>();
-            builder.Services.AddScoped<API_DigiBook.Repositories.IReviewRepository, API_DigiBook.Repositories.ReviewRepository>();
-            builder.Services.AddScoped<API_DigiBook.Repositories.ICouponRepository, API_DigiBook.Repositories.CouponRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IBookRepository, API_DigiBook.Repositories.BookRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.ICategoryRepository, API_DigiBook.Repositories.CategoryRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IAuthorRepository, API_DigiBook.Repositories.AuthorRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IUserRepository, API_DigiBook.Repositories.UserRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IOrderRepository, API_DigiBook.Repositories.OrderRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IReviewRepository, API_DigiBook.Repositories.ReviewRepository>();
+            builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.ICouponRepository, API_DigiBook.Repositories.CouponRepository>();
             
             // Register Command Pattern services
             builder.Services.AddScoped<API_DigiBook.Commands.CommandInvoker>();

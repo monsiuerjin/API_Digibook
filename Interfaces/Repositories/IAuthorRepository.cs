@@ -1,6 +1,6 @@
 using API_DigiBook.Models;
 
-namespace API_DigiBook.Repositories
+namespace API_DigiBook.Interfaces.Repositories
 {
     public interface IAuthorRepository : IRepository<Author>
     {

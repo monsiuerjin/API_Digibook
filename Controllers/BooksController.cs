@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Google.Cloud.Firestore;
 using API_DigiBook.Models;
-using API_DigiBook.Repositories;
-using API_DigiBook.Services;
+using API_DigiBook.Interfaces.Repositories;
+using API_DigiBook.Singleton;
 
 namespace API_DigiBook.Controllers
 {
@@ -407,6 +407,124 @@ namespace API_DigiBook.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting top rated books");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving books",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get book by slug (SEO-friendly URL)
+        /// </summary>
+        [HttpGet("slug/{slug}")]
+        public async Task<IActionResult> GetBookBySlug(string slug)
+        {
+            try
+            {
+                var book = await _bookRepository.GetBySlugAsync(slug);
+
+                if (book == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Book with slug '{slug}' not found"
+                    });
+                }
+
+                // Increment view count when book is viewed
+                await _bookRepository.IncrementViewCountAsync(book.Id);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = book
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting book by slug: {Slug}", slug);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving book",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get book by ID
+        /// </summary>
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetBookById(string id)
+        {
+            try
+            {
+                var book = await _bookRepository.GetByIdAsync(id);
+
+                if (book == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Book with ID '{id}' not found"
+                    });
+                }
+
+                // Increment view count when book is viewed
+                await _bookRepository.IncrementViewCountAsync(id);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = book
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting book by ID: {Id}", id);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving book",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get multiple books by IDs (for wishlist)
+        /// </summary>
+        [HttpPost("by-ids")]
+        public async Task<IActionResult> GetBooksByIds([FromBody] List<string> bookIds)
+        {
+            try
+            {
+                if (bookIds == null || !bookIds.Any())
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Book IDs are required"
+                    });
+                }
+
+                var books = await _bookRepository.GetByIdsAsync(bookIds);
+
+                return Ok(new
+                {
+                    success = true,
+                    count = books.Count(),
+                    data = books
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting books by IDs");
                 return StatusCode(500, new
                 {
                     success = false,

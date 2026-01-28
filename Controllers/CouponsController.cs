@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Google.Cloud.Firestore;
 using API_DigiBook.Models;
-using API_DigiBook.Repositories;
+using API_DigiBook.Interfaces.Repositories;
 
 namespace API_DigiBook.Controllers
 {

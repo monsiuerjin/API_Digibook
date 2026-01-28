@@ -1,4 +1,4 @@
-namespace API_DigiBook.Services.Discount
+namespace API_DigiBook.Interfaces.Services
 {
     /// <summary>
     /// Base interface for price calculation (Component in Decorator Pattern)

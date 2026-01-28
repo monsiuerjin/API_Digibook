@@ -1,7 +1,8 @@
 using API_DigiBook.Models;
+using API_DigiBook.Services;
 using Google.Cloud.Firestore;
 
-namespace API_DigiBook.Services
+namespace API_DigiBook.Singleton
 {
     /// <summary>
     /// Singleton Logger Service for logging system activities to Firestore

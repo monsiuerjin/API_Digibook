@@ -1,4 +1,6 @@
-namespace API_DigiBook.Services.Discount
+using API_DigiBook.Interfaces.Services;
+
+namespace API_DigiBook.Decorator
 {
     /// <summary>
     /// Concrete Component - Base price without any discounts

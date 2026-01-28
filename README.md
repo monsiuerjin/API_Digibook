@@ -2,6 +2,52 @@
 
 API RESTful cho hệ thống quản lý sách điện tử DigiBook, sử dụng ASP.NET Core 6.0 và Firebase Firestore.
 
+## 🆕 Cập Nhật Mới Nhất (2024)
+
+API đã được **hoàn toàn đồng bộ** với models của DigiBook frontend! 
+
+**Highlights:**
+- ✅ Book model với 34 fields (bao gồm SEO, Tiki integration, rich data)
+- ✅ User model với quản lý địa chỉ & wishlist
+- ✅ Address management endpoints (CRUD)
+- ✅ Wishlist management endpoints
+- ✅ SEO-friendly URLs với slug
+- ✅ View count tracking tự động
+
+## 🎯 Design Patterns
+
+API sử dụng **5 Design Patterns** chính:
+
+### 1. 📦 Repository Pattern
+- **Location:** `Repositories/`
+- Tách biệt data access logic khỏi business logic
+- 8 repositories cho: Books, Users, Authors, Categories, Orders, Reviews, Coupons
+- Sử dụng trong tất cả Controllers
+
+### 2. ⚡ Command Pattern
+- **Location:** `Commands/`
+- Encapsulate operations thành objects
+- Hỗ trợ command history & logging
+- Sử dụng cho Order operations (Create, Update, Cancel, Delete)
+
+### 3. 🔐 Singleton Pattern
+- **Location:** `Singleton/`
+- `LoggerService.Instance` - logging service duy nhất cho toàn app
+- Thread-safe với double-check locking
+- Sử dụng trong nhiều controllers
+
+### 4. 🎁 Decorator Pattern
+- **Location:** `Decorator/`
+- Add discount behaviors động
+- 6 loại decorators: Coupon, Percentage, Fixed Amount, Membership, Bulk Purchase, Seasonal
+- Cho phép stack nhiều discounts
+
+### 5. 🎯 Strategy Pattern
+- **Location:** `Strategy/`
+- Switch giữa các chiến lược tính giá khác nhau tại runtime
+- 4 strategies: Regular (no discount), Member (10% off), Wholesale (tiered discounts), VIP (20-30% off)
+- Sử dụng trong PricingController
+
 ## 📋 Yêu cầu
 
 - .NET 6.0 SDK
@@ -70,35 +116,49 @@ API sẽ chạy tại:
 
 ```
 API_DigiBook/
-├── Controllers/          # API Controllers
-│   ├── BooksController.cs
-│   └── CategoriesController.cs
-├── Models/              # Data Models
-│   ├── Book.cs
-│   ├── Author.cs
-│   ├── Category.cs
-│   ├── User.cs
-│   ├── Order.cs
-│   ├── Review.cs
-│   ├── AIModel.cs
-│   ├── Coupon.cs
-│   ├── SystemLog.cs
-│   └── SystemConfig.cs
-├── Repositories/        # Repository Pattern
-│   ├── IRepository.cs
+├── Interfaces/                          # ✨ Tất cả interfaces
+│   ├── Repositories/                    # Repository interfaces
+│   │   ├── IRepository.cs
+│   │   ├── IBookRepository.cs
+│   │   ├── IUserRepository.cs
+│   │   └── ... (8 interfaces)
+│   ├── Services/                        # Service interfaces
+│   │   ├── IPriceCalculator.cs
+│   │   └── IPricingStrategy.cs         # Strategy pattern interface
+│   └── Commands/                        # Command pattern interfaces
+│       └── ICommand.cs
+├── Repositories/                        # Repository Implementations
 │   ├── FirestoreRepository.cs
-│   ├── IBookRepository.cs & BookRepository.cs
-│   ├── ICategoryRepository.cs & CategoryRepository.cs
-│   ├── IAuthorRepository.cs & AuthorRepository.cs
-│   ├── IUserRepository.cs & UserRepository.cs
-│   ├── IOrderRepository.cs & OrderRepository.cs
-│   ├── IReviewRepository.cs & ReviewRepository.cs
-│   └── ICouponRepository.cs & CouponRepository.cs
-├── Services/            # Business Logic Services
+│   ├── BookRepository.cs
+│   ├── UserRepository.cs
+│   └── ... (8 repositories)
+├── Singleton/                           # Singleton Pattern
+│   └── LoggerService.cs
+├── Decorator/                           # Decorator Pattern
+│   ├── BasePriceCalculator.cs
+│   └── Decorators/
+│       ├── DiscountDecorator.cs
+│       ├── CouponDiscountDecorator.cs
+│       └── ... (6 decorators)
+├── Strategy/                            # Strategy Pattern
+│   ├── PricingContext.cs
+│   └── Strategies/
+│       ├── RegularPricingStrategy.cs
+│       ├── MemberPricingStrategy.cs
+│       ├── WholesalePricingStrategy.cs
+│       └── VIPPricingStrategy.cs
+├── Commands/                            # Command Pattern
+│   ├── CommandInvoker.cs
+│   └── Orders/
+│       ├── CreateOrderCommand.cs
+│       └── ... (5 commands)
+├── Services/
 │   └── FirebaseService.cs
-├── Program.cs           # Entry point
-├── .env                 # Environment variables (không commit)
-└── firebase-credentials.json  # Firebase credentials (không commit)
+├── Controllers/                         # API Controllers (10 controllers)
+├── Models/                              # Data Models (11 models)
+├── Program.cs                           # Entry point
+├── .env                                 # Environment variables (không commit)
+└── firebase-credentials.json            # Firebase credentials (không commit)
 ```
 
 ## 🏗️ Kiến trúc - Repository Pattern
@@ -156,15 +216,26 @@ public class BooksController : ControllerBase
 
 #### Specific Methods (theo từng repository):
 - **IBookRepository:**
+  - `GetByIsbnAsync(isbn)`
+  - `GetBySlugAsync(slug)` 🆕
   - `GetByAuthorAsync(authorId)` 
   - `GetByCategoryAsync(category)`
   - `SearchByTitleAsync(title)`
   - `GetTopRatedAsync(count)`
+  - `IncrementViewCountAsync(bookId)` 🆕
+  - `GetByIdsAsync(bookIds)` 🆕
 
 - **IUserRepository:**
   - `GetByEmailAsync(email)`
   - `GetByRoleAsync(role)`
   - `GetByStatusAsync(status)`
+  - `AddAddressAsync(userId, address)` 🆕
+  - `UpdateAddressAsync(userId, addressId, address)` 🆕
+  - `DeleteAddressAsync(userId, addressId)` 🆕
+  - `SetDefaultAddressAsync(userId, addressId)` 🆕
+  - `AddToWishlistAsync(userId, bookId)` 🆕
+  - `RemoveFromWishlistAsync(userId, bookId)` 🆕
+  - `GetWishlistAsync(userId)` 🆕
 
 - **IOrderRepository:**
   - `GetByUserIdAsync(userId)`
@@ -198,6 +269,8 @@ public class BooksController : ControllerBase
 - Thông tin cá nhân
 - Role (user/admin)
 - Status (active/banned)
+- Addresses (array) 🆕
+- WishlistIds (array) 🆕
 
 ### 5. **orders** - Đơn hàng
 - Thông tin khách hàng
@@ -228,12 +301,12 @@ public class BooksController : ControllerBase
 
 ## 🔌 API Endpoints
 
-### 📚 Books API
+### 📚 Books API (11 endpoints)
 
 #### Basic CRUD
 ```http
 GET    /api/books              # Get all books
-GET    /api/books/{id}         # Get book by ID
+GET    /api/books/{id}         # Get book by ID (auto increment view) 🆕
 POST   /api/books              # Create new book
 PUT    /api/books/{id}         # Update book
 DELETE /api/books/{id}         # Delete book
@@ -241,11 +314,52 @@ DELETE /api/books/{id}         # Delete book
 
 #### Advanced Queries
 ```http
-GET /api/books/test-connection     # Test Firebase connection
-GET /api/books/author/{authorId}   # Get books by author
-GET /api/books/category/{category} # Get books by category
-GET /api/books/search?title={name} # Search books by title
-GET /api/books/top-rated?count=10  # Get top rated books
+GET  /api/books/test-connection     # Test Firebase connection
+GET  /api/books/isbn/{isbn}         # Get book by ISBN
+GET  /api/books/slug/{slug}         # Get book by slug (SEO) 🆕
+GET  /api/books/author/{authorId}   # Get books by author
+GET  /api/books/category/{category} # Get books by category
+GET  /api/books/search?title={name} # Search books by title
+GET  /api/books/top-rated?count=10  # Get top rated books
+POST /api/books/by-ids              # Get multiple books by IDs 🆕
+```
+
+### 💰 Pricing API (3 endpoints) 🆕
+
+#### Strategy Pattern Demo
+```http
+POST /api/pricing/calculate        # Calculate price with specific strategy
+POST /api/pricing/compare           # Compare all pricing strategies
+GET  /api/pricing/strategies        # Get available strategies
+```
+
+### 👤 Users API (16 endpoints)
+
+#### Basic CRUD
+```http
+GET    /api/users                 # Get all users
+GET    /api/users/{id}            # Get user by ID
+GET    /api/users/email/{email}   # Get user by email
+GET    /api/users/role/{role}     # Get users by role
+GET    /api/users/status/{status} # Get users by status
+POST   /api/users                 # Create new user
+PUT    /api/users/{id}            # Update user
+DELETE /api/users/{id}            # Delete user
+```
+
+#### Address Management 🆕
+```http
+POST   /api/users/{userId}/addresses                      # Add address
+PUT    /api/users/{userId}/addresses/{addressId}          # Update address
+DELETE /api/users/{userId}/addresses/{addressId}          # Delete address
+PATCH  /api/users/{userId}/addresses/{addressId}/set-default  # Set default
+```
+
+#### Wishlist Management 🆕
+```http
+POST   /api/users/{userId}/wishlist/{bookId}  # Add to wishlist
+DELETE /api/users/{userId}/wishlist/{bookId}  # Remove from wishlist
+GET    /api/users/{userId}/wishlist           # Get wishlist IDs
 ```
 
 #### Request Example (Create Book)

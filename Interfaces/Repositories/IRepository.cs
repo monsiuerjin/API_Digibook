@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 
-namespace API_DigiBook.Repositories
+namespace API_DigiBook.Interfaces.Repositories
 {
     /// <summary>
     /// Generic repository interface for CRUD operations

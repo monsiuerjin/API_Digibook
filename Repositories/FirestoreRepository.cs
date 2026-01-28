@@ -1,5 +1,6 @@
 using Google.Cloud.Firestore;
 using API_DigiBook.Services;
+using API_DigiBook.Interfaces.Repositories;
 using System.Linq.Expressions;
 
 namespace API_DigiBook.Repositories
