@@ -38,6 +38,15 @@ namespace API_DigiBook.Models
         [FirestoreProperty("status")]
         public string Status { get; set; } = "active";
 
+        [FirestoreProperty("membershipTier")]
+        public string MembershipTier { get; set; } = "regular"; // regular, member, vip
+
+        [FirestoreProperty("membershipExpiry")]
+        public string MembershipExpiry { get; set; } = string.Empty;
+
+        [FirestoreProperty("totalSpent")]
+        public double TotalSpent { get; set; } = 0;
+
         [FirestoreProperty("wishlistIds")]
         public List<string> WishlistIds { get; set; } = new List<string>();
 

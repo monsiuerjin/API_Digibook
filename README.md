@@ -38,15 +38,23 @@ API sử dụng **5 Design Patterns** chính:
 
 ### 4. 🎁 Decorator Pattern
 - **Location:** `Decorator/`
-- Add discount behaviors động
-- 6 loại decorators: Coupon, Percentage, Fixed Amount, Membership, Bulk Purchase, Seasonal
-- Cho phép stack nhiều discounts
+- **Integration:** Tích hợp với Checkout & Coupon System
+- **Use Cases:**
+  - Stack multiple discounts: Membership + Coupon + Seasonal promotion
+  - 6 loại decorators: Coupon, Percentage, Fixed Amount, Membership, Bulk Purchase, Seasonal
+  - Endpoint: `POST /api/discount/calculate-checkout` - Calculate total với stacked discounts
+  - Support Firestore coupons integration
+- **Real Application:** Frontend checkout page có thể call API để tính tổng tiền với nhiều loại giảm giá khác nhau (member discount + coupon + promotional sale)
 
 ### 5. 🎯 Strategy Pattern
 - **Location:** `Strategy/`
-- Switch giữa các chiến lược tính giá khác nhau tại runtime
-- 4 strategies: Regular (no discount), Member (10% off), Wholesale (tiered discounts), VIP (20-30% off)
-- Sử dụng trong PricingController
+- **Integration:** Tích hợp với User Membership System
+- **Use Cases:**
+  - Auto-select pricing strategy dựa trên `membershipTier` của user
+  - 4 strategies: Regular (0%), Member (10%), Wholesale (5-25%), VIP (20-30%)
+  - Endpoint: `POST /api/pricing/calculate-for-user/{userId}` - Calculate giá dựa trên membership
+  - Endpoint: `GET /api/pricing/membership/{userId}` - Get thông tin membership & benefits
+- **Real Application:** Frontend checkout process có thể call API để show giá theo membership tier của user
 
 ## 📋 Yêu cầu
 
@@ -301,6 +309,18 @@ public class BooksController : ControllerBase
 - AI settings
 - Các cấu hình khác
 
+## 🔗 Tích Hợp với DigiBook Frontend
+
+📖 **[INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md)** - Hướng dẫn chi tiết tích hợp Strategy & Decorator Patterns
+
+**Quick Summary:**
+- ✅ **Strategy Pattern**: Auto-pricing dựa trên membership tier (regular/member/vip)
+- ✅ **Decorator Pattern**: Stack multiple discounts (membership + coupon + seasonal)
+- ✅ **Endpoints Ready**: `/api/pricing/calculate-for-user/{userId}` & `/api/discount/calculate-checkout`
+- ✅ **User Model Updated**: Added `membershipTier`, `totalSpent` fields
+
+---
+
 ## 🔌 API Endpoints
 
 ### 📚 Books API (11 endpoints)
@@ -325,13 +345,26 @@ GET  /api/books/top-rated?count=10  # Get top rated books
 POST /api/books/by-ids              # Get multiple books by IDs (for wishlist) 🆕
 ```
 
-### 💰 Pricing API (3 endpoints) 🆕
+### 💰 Pricing API (5 endpoints) 🆕
 
-#### Strategy Pattern Demo
+#### Strategy Pattern - Membership Pricing
 ```http
-POST /api/pricing/calculate        # Calculate price with specific strategy
-POST /api/pricing/compare           # Compare all pricing strategies
-GET  /api/pricing/strategies        # Get available strategies
+POST /api/pricing/calculate                    # Calculate price with specific strategy
+POST /api/pricing/calculate-for-user/{userId}  # Calculate based on user membership ⭐
+GET  /api/pricing/membership/{userId}          # Get membership info & benefits ⭐
+POST /api/pricing/compare                      # Compare all pricing strategies
+GET  /api/pricing/strategies                   # Get available strategies
+```
+
+### 🎁 Discount API (5 endpoints) 🆕
+
+#### Decorator Pattern - Stack Multiple Discounts
+```http
+POST /api/discount/calculate              # Stack custom discounts
+POST /api/discount/calculate-checkout     # Checkout total with stacked discounts ⭐
+POST /api/discount/apply-coupon           # Apply & validate coupon
+POST /api/discount/black-friday           # Example: Black Friday sale
+GET  /api/discount/quick                  # Quick percentage discount
 ```
 
 ### 👤 Users API (16 endpoints)

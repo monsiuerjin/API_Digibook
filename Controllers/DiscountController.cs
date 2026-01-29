@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using API_DigiBook.Models;
 using API_DigiBook.Interfaces.Services;
+using API_DigiBook.Interfaces.Repositories;
 using API_DigiBook.Decorator;
 using API_DigiBook.Decorator.Decorators;
 using API_DigiBook.Singleton;
@@ -13,11 +14,18 @@ namespace API_DigiBook.Controllers
     {
         private readonly ILogger<DiscountController> _logger;
         private readonly LoggerService _systemLogger;
+        private readonly IUserRepository _userRepository;
+        private readonly ICouponRepository _couponRepository;
 
-        public DiscountController(ILogger<DiscountController> logger)
+        public DiscountController(
+            ILogger<DiscountController> logger,
+            IUserRepository userRepository,
+            ICouponRepository couponRepository)
         {
             _logger = logger;
             _systemLogger = LoggerService.Instance;
+            _userRepository = userRepository;
+            _couponRepository = couponRepository;
         }
 
         /// <summary>
@@ -275,6 +283,143 @@ namespace API_DigiBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Calculate checkout total with stacked discounts (Decorator Pattern + Strategy Pattern)
+        /// Used by DigiBook checkout process
+        /// </summary>
+        [HttpPost("calculate-checkout")]
+        public async Task<IActionResult> CalculateCheckout([FromBody] CheckoutCalculationRequest request)
+        {
+            try
+            {
+                // Start with subtotal
+                IPriceCalculator calculator = new BasePriceCalculator(request.Subtotal, "Order");
+
+                var appliedDiscounts = new List<object>();
+                var discountBreakdown = new List<string>();
+
+                // 1. Apply Membership Discount (if user is logged in)
+                if (!string.IsNullOrEmpty(request.UserId))
+                {
+                    var user = await _userRepository.GetByIdAsync(request.UserId);
+                    if (user != null && !string.IsNullOrEmpty(user.MembershipTier) && user.MembershipTier.ToLower() != "regular")
+                    {
+                        var beforeMembership = calculator.Calculate();
+                        calculator = new MembershipDiscountDecorator(calculator, user.MembershipTier);
+                        var afterMembership = calculator.Calculate();
+                        var membershipSavings = beforeMembership - afterMembership;
+
+                        appliedDiscounts.Add(new
+                        {
+                            type = "Membership",
+                            tier = user.MembershipTier,
+                            savings = membershipSavings
+                        });
+                        discountBreakdown.Add($"Membership ({user.MembershipTier}): -{membershipSavings:N0}đ");
+                    }
+                }
+
+                // 2. Apply Coupon Discount (if provided)
+                if (!string.IsNullOrEmpty(request.CouponCode))
+                {
+                    var coupon = await _couponRepository.GetByCodeAsync(request.CouponCode);
+                    if (coupon != null && coupon.IsActive)
+                    {
+                        var beforeCoupon = calculator.Calculate();
+                        calculator = new CouponDiscountDecorator(
+                            calculator,
+                            coupon.Code,
+                            coupon.DiscountValue,
+                            coupon.DiscountType == "percentage"
+                        );
+                        var afterCoupon = calculator.Calculate();
+                        var couponSavings = beforeCoupon - afterCoupon;
+
+                        appliedDiscounts.Add(new
+                        {
+                            type = "Coupon",
+                            code = coupon.Code,
+                            discountType = coupon.DiscountType,
+                            discountValue = coupon.DiscountValue,
+                            savings = couponSavings
+                        });
+                        discountBreakdown.Add($"Coupon ({coupon.Code}): -{couponSavings:N0}đ");
+                    }
+                    else
+                    {
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "Invalid or inactive coupon code"
+                        });
+                    }
+                }
+
+                // 3. Apply Seasonal/Promotional Discount (if active)
+                if (request.ApplySeasonalDiscount)
+                {
+                    var beforeSeasonal = calculator.Calculate();
+                    calculator = new SeasonalDiscountDecorator(
+                        calculator,
+                        "Spring Sale",
+                        5, // 5% seasonal discount
+                        DateTime.Now.AddDays(-7),
+                        DateTime.Now.AddDays(7)
+                    );
+                    var afterSeasonal = calculator.Calculate();
+                    var seasonalSavings = beforeSeasonal - afterSeasonal;
+
+                    if (seasonalSavings > 0)
+                    {
+                        appliedDiscounts.Add(new
+                        {
+                            type = "Seasonal",
+                            name = "Spring Sale",
+                            savings = seasonalSavings
+                        });
+                        discountBreakdown.Add($"Spring Sale: -{seasonalSavings:N0}đ");
+                    }
+                }
+
+                // Calculate final total
+                var finalSubtotal = calculator.Calculate();
+                var totalSavings = request.Subtotal - finalSubtotal;
+                var finalTotal = finalSubtotal + request.Shipping;
+
+                await _systemLogger.LogSuccessAsync(
+                    "CHECKOUT_CALCULATION",
+                    $"Checkout calculated: {request.Subtotal:N0} -> {finalTotal:N0} VND ({appliedDiscounts.Count} discounts)",
+                    request.UserId ?? "Anonymous"
+                );
+
+                return Ok(new
+                {
+                    success = true,
+                    data = new
+                    {
+                        subtotal = request.Subtotal,
+                        shipping = request.Shipping,
+                        discountedSubtotal = finalSubtotal,
+                        totalSavings = totalSavings,
+                        finalTotal = finalTotal,
+                        appliedDiscounts = appliedDiscounts,
+                        discountBreakdown = discountBreakdown,
+                        description = calculator.GetDescription()
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calculating checkout");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error calculating checkout",
+                    error = ex.Message
+                });
+            }
+        }
+
         private IPriceCalculator ApplyDiscount(IPriceCalculator calculator, DiscountItem discount, int quantity)
         {
             return discount.Type.ToUpper() switch
@@ -313,6 +458,15 @@ namespace API_DigiBook.Controllers
                 _ => calculator
             };
         }
+    }
+
+    public class CheckoutCalculationRequest
+    {
+        public string? UserId { get; set; }
+        public double Subtotal { get; set; }
+        public double Shipping { get; set; }
+        public string? CouponCode { get; set; }
+        public bool ApplySeasonalDiscount { get; set; } = false;
     }
 
     public class SimpleDiscountRequest

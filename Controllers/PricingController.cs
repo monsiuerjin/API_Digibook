@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using API_DigiBook.Models;
 using API_DigiBook.Interfaces.Services;
+using API_DigiBook.Interfaces.Repositories;
 using API_DigiBook.Strategy;
 using API_DigiBook.Strategy.Strategies;
 using API_DigiBook.Singleton;
@@ -13,11 +14,13 @@ namespace API_DigiBook.Controllers
     {
         private readonly ILogger<PricingController> _logger;
         private readonly LoggerService _systemLogger;
+        private readonly IUserRepository _userRepository;
 
-        public PricingController(ILogger<PricingController> logger)
+        public PricingController(ILogger<PricingController> logger, IUserRepository userRepository)
         {
             _logger = logger;
             _systemLogger = LoggerService.Instance;
+            _userRepository = userRepository;
         }
 
         /// <summary>
@@ -231,6 +234,132 @@ namespace API_DigiBook.Controllers
                 count = result.Count,
                 data = result
             });
+        }
+
+        /// <summary>
+        /// Calculate price for user based on their membership tier (Strategy Pattern in action!)
+        /// </summary>
+        [HttpPost("calculate-for-user/{userId}")]
+        public async Task<IActionResult> CalculatePriceForUser(string userId, [FromBody] PricingRequest request)
+        {
+            try
+            {
+                // Get user to determine membership tier
+                var user = await _userRepository.GetByIdAsync(userId);
+
+                if (user == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "User not found"
+                    });
+                }
+
+                // Auto-select strategy based on user membership
+                IPricingStrategy strategy = user.MembershipTier?.ToLower() switch
+                {
+                    "vip" => new VIPPricingStrategy(),
+                    "member" => new MemberPricingStrategy(),
+                    _ => new RegularPricingStrategy()
+                };
+
+                var pricingContext = new PricingContext(strategy);
+                double finalPrice = pricingContext.ExecuteStrategy(request.BasePrice, request.Quantity);
+                double originalTotal = request.BasePrice * request.Quantity;
+                double savings = originalTotal - finalPrice;
+
+                await _systemLogger.LogInfoAsync(
+                    "USER_PRICING",
+                    $"Calculated price for {user.Name} ({user.MembershipTier}): {finalPrice:N0} VND",
+                    userId
+                );
+
+                return Ok(new
+                {
+                    success = true,
+                    data = new
+                    {
+                        userId = userId,
+                        userName = user.Name,
+                        membershipTier = user.MembershipTier,
+                        productName = request.ProductName ?? "Product",
+                        basePrice = request.BasePrice,
+                        quantity = request.Quantity,
+                        originalTotal = originalTotal,
+                        finalPrice = finalPrice,
+                        savings = savings,
+                        savingsPercentage = Math.Round((savings / originalTotal) * 100, 2),
+                        strategy = new
+                        {
+                            name = pricingContext.GetCurrentStrategyName(),
+                            description = pricingContext.GetCurrentStrategyDescription()
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calculating price for user {UserId}", userId);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error calculating price",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get user membership info
+        /// </summary>
+        [HttpGet("membership/{userId}")]
+        public async Task<IActionResult> GetMembershipInfo(string userId)
+        {
+            try
+            {
+                var user = await _userRepository.GetByIdAsync(userId);
+
+                if (user == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "User not found"
+                    });
+                }
+
+                var tierInfo = user.MembershipTier?.ToLower() switch
+                {
+                    "vip" => new { name = "VIP", discount = "20-30%", color = "#FFD700", benefits = new[] { "20% base discount", "Extra 5% for 5+ items", "Extra 5% for 10+ items", "Priority support", "Early access to sales" } },
+                    "member" => new { name = "Member", discount = "10%", color = "#C0C0C0", benefits = new[] { "10% discount on all orders", "Member-only promotions", "Free shipping on orders > 500k" } },
+                    _ => new { name = "Regular", discount = "0%", color = "#CD7F32", benefits = new[] { "Standard pricing", "Access to promotions", "Earn points for upgrade" } }
+                };
+
+                return Ok(new
+                {
+                    success = true,
+                    data = new
+                    {
+                        userId = userId,
+                        userName = user.Name,
+                        membershipTier = user.MembershipTier ?? "regular",
+                        membershipExpiry = user.MembershipExpiry,
+                        totalSpent = user.TotalSpent,
+                        tierInfo = tierInfo
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting membership info for user {UserId}", userId);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving membership info",
+                    error = ex.Message
+                });
+            }
         }
 
         /// <summary>
