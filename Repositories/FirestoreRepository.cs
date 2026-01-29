@@ -2,6 +2,7 @@ using Google.Cloud.Firestore;
 using API_DigiBook.Services;
 using API_DigiBook.Interfaces.Repositories;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace API_DigiBook.Repositories
 {
@@ -34,6 +35,18 @@ namespace API_DigiBook.Repositories
                     if (document.Exists)
                     {
                         var item = document.ConvertTo<T>();
+                        
+                        // Ensure Id is set from document ID
+                        var idProperty = typeof(T).GetProperty("Id");
+                        if (idProperty != null && idProperty.PropertyType == typeof(string))
+                        {
+                            var currentId = idProperty.GetValue(item) as string;
+                            if (string.IsNullOrEmpty(currentId))
+                            {
+                                idProperty.SetValue(item, document.Id);
+                            }
+                        }
+                        
                         items.Add(item);
                     }
                 }
@@ -59,7 +72,16 @@ namespace API_DigiBook.Repositories
                     return null;
                 }
 
-                return snapshot.ConvertTo<T>();
+                var item = snapshot.ConvertTo<T>();
+                
+                // Ensure Id is set from document ID
+                var idProperty = typeof(T).GetProperty("Id");
+                if (idProperty != null && idProperty.PropertyType == typeof(string))
+                {
+                    idProperty.SetValue(item, snapshot.Id);
+                }
+
+                return item;
             }
             catch (Exception ex)
             {

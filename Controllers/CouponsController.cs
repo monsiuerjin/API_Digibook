@@ -367,6 +367,84 @@ namespace API_DigiBook.Controllers
                 });
             }
         }
+
+        /// <summary>
+        /// Increment usage count of a coupon
+        /// </summary>
+        [HttpPost("{id}/increment-usage")]
+        public async Task<IActionResult> IncrementUsage(string id)
+        {
+            try
+            {
+                var coupon = await _couponRepository.GetByIdAsync(id);
+                if (coupon == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Coupon with ID '{id}' not found"
+                    });
+                }
+
+                await _couponRepository.IncrementUsageAsync(id);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Coupon usage incremented successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error incrementing usage for coupon: {Id}", id);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error incrementing coupon usage",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Toggle active status of a coupon
+        /// </summary>
+        [HttpPost("{id}/toggle-active")]
+        public async Task<IActionResult> ToggleActive(string id)
+        {
+            try
+            {
+                var coupon = await _couponRepository.GetByIdAsync(id);
+                if (coupon == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Coupon with ID '{id}' not found"
+                    });
+                }
+
+                coupon.IsActive = !coupon.IsActive;
+                await _couponRepository.UpdateAsync(id, coupon);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Coupon is now {(coupon.IsActive ? "active" : "inactive")}",
+                    data = new { isActive = coupon.IsActive }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error toggling active status for coupon: {Id}", id);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error toggling coupon status",
+                    error = ex.Message
+                });
+            }
+        }
     }
 
     public class ValidateCouponRequest

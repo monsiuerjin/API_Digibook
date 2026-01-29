@@ -80,6 +80,43 @@ namespace API_DigiBook.Controllers
         }
 
         /// <summary>
+        /// Get book by ID
+        /// </summary>
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetBookById(string id)
+        {
+            try
+            {
+                var book = await _bookRepository.GetByIdAsync(id);
+
+                if (book == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Book with ID '{id}' not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = book
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting book by ID: {Id}", id);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving book",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
         /// Get book by ISBN
         /// </summary>
         [HttpGet("isbn/{isbn}")]

@@ -11,12 +11,42 @@ namespace API_DigiBook.Repositories
         {
         }
 
+        public override async Task<string> AddAsync(Review entity, string? customId = null)
+        {
+            try 
+            {
+                if (string.IsNullOrEmpty(entity.BookId))
+                {
+                    throw new ArgumentException("BookId is required for adding a review");
+                }
+
+                var collectionRef = _db.Collection("books").Document(entity.BookId).Collection("reviews");
+
+                if (!string.IsNullOrEmpty(customId))
+                {
+                    var docRef = collectionRef.Document(customId);
+                    await docRef.SetAsync(entity);
+                    return customId;
+                }
+                else
+                {
+                    var docRef = await collectionRef.AddAsync(entity);
+                    return docRef.Id;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error adding review to book {BookId}", entity.BookId);
+                throw;
+            }
+        }
+
         public async Task<IEnumerable<Review>> GetByBookIdAsync(string bookId)
         {
             try
             {
-                var query = _db.Collection(_collectionName)
-                    .WhereEqualTo("bookId", bookId)
+                // Correct path: books/{bookId}/reviews
+                var query = _db.Collection("books").Document(bookId).Collection("reviews")
                     .OrderByDescending("createdAt");
                 
                 var snapshot = await query.GetSnapshotAsync();
@@ -45,7 +75,8 @@ namespace API_DigiBook.Repositories
         {
             try
             {
-                var query = _db.Collection(_collectionName)
+                // Collection Group Query for nested reviews
+                var query = _db.CollectionGroup("reviews")
                     .WhereEqualTo("userId", userId)
                     .OrderByDescending("createdAt");
                 

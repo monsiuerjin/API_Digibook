@@ -15,9 +15,9 @@ namespace API_DigiBook.Repositories
         {
             try
             {
+                // Query without ordering first, as some old orders may not have createdAt
                 var query = _db.Collection(_collectionName)
-                    .WhereEqualTo("userId", userId)
-                    .OrderByDescending("createdAt");
+                    .WhereEqualTo("userId", userId);
                 
                 var snapshot = await query.GetSnapshotAsync();
                 var orders = new List<Order>();
@@ -32,7 +32,12 @@ namespace API_DigiBook.Repositories
                     }
                 }
 
-                return orders;
+                // Sort in memory by createdAt if available, otherwise by date string
+                return orders.OrderByDescending(o => 
+                    o.CreatedAt != null && o.CreatedAt != default(Timestamp) 
+                        ? o.CreatedAt.ToDateTime() 
+                        : DateTime.TryParse(o.Date, out var dt) ? dt : DateTime.MinValue
+                ).ToList();
             }
             catch (Exception ex)
             {
