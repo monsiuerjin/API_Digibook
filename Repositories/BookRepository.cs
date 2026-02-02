@@ -246,5 +246,124 @@ namespace API_DigiBook.Repositories
                 throw;
             }
         }
+
+        public async Task<Book?> PatchByIsbnAsync(string isbn, BookPatchDto patchDto)
+        {
+            try
+            {
+                // Find the book by ISBN first
+                var existingBook = await GetByIsbnAsync(isbn);
+                
+                if (existingBook == null)
+                {
+                    return null;
+                }
+
+                var docRef = _db.Collection(_collectionName).Document(existingBook.Id);
+                var updates = new Dictionary<string, object>();
+
+                // Only update fields that are provided (not null)
+                if (patchDto.Title != null)
+                    updates["title"] = patchDto.Title;
+                
+                if (patchDto.Author != null)
+                    updates["author"] = patchDto.Author;
+                
+                if (patchDto.AuthorId != null)
+                    updates["authorId"] = patchDto.AuthorId;
+                
+                if (patchDto.AuthorBio != null)
+                    updates["authorBio"] = patchDto.AuthorBio;
+                
+                if (patchDto.Category != null)
+                    updates["category"] = patchDto.Category;
+                
+                if (patchDto.Price.HasValue)
+                    updates["price"] = patchDto.Price.Value;
+                
+                if (patchDto.OriginalPrice.HasValue)
+                    updates["originalPrice"] = patchDto.OriginalPrice.Value;
+                
+                if (patchDto.StockQuantity.HasValue)
+                    updates["stockQuantity"] = patchDto.StockQuantity.Value;
+                
+                if (patchDto.Rating.HasValue)
+                    updates["rating"] = patchDto.Rating.Value;
+                
+                if (patchDto.Cover != null)
+                    updates["cover"] = patchDto.Cover;
+                
+                if (patchDto.Description != null)
+                    updates["description"] = patchDto.Description;
+                
+                if (patchDto.Isbn != null)
+                    updates["isbn"] = patchDto.Isbn;
+                
+                if (patchDto.Pages.HasValue)
+                    updates["pages"] = patchDto.Pages.Value;
+                
+                if (patchDto.Publisher != null)
+                    updates["publisher"] = patchDto.Publisher;
+                
+                if (patchDto.PublishYear.HasValue)
+                    updates["publishYear"] = patchDto.PublishYear.Value;
+                
+                if (patchDto.Language != null)
+                    updates["language"] = patchDto.Language;
+                
+                if (patchDto.Badge != null)
+                    updates["badge"] = patchDto.Badge;
+                
+                if (patchDto.IsAvailable.HasValue)
+                    updates["isAvailable"] = patchDto.IsAvailable.Value;
+                
+                if (patchDto.Slug != null)
+                    updates["slug"] = patchDto.Slug;
+                
+                if (patchDto.ViewCount.HasValue)
+                    updates["viewCount"] = patchDto.ViewCount.Value;
+                
+                if (patchDto.SearchKeywords != null)
+                    updates["searchKeywords"] = patchDto.SearchKeywords;
+                
+                if (patchDto.ReviewCount.HasValue)
+                    updates["reviewCount"] = patchDto.ReviewCount.Value;
+                
+                if (patchDto.DiscountRate.HasValue)
+                    updates["discountRate"] = patchDto.DiscountRate.Value;
+                
+                if (patchDto.Images != null)
+                    updates["images"] = patchDto.Images;
+                
+                if (patchDto.Dimensions != null)
+                    updates["dimensions"] = patchDto.Dimensions;
+                
+                if (patchDto.Translator != null)
+                    updates["translator"] = patchDto.Translator;
+                
+                if (patchDto.BookLayout != null)
+                    updates["bookLayout"] = patchDto.BookLayout;
+                
+                if (patchDto.Manufacturer != null)
+                    updates["manufacturer"] = patchDto.Manufacturer;
+
+                // Always update the updatedAt timestamp
+                updates["updatedAt"] = Timestamp.GetCurrentTimestamp();
+
+                // Perform the update
+                if (updates.Any())
+                {
+                    await docRef.UpdateAsync(updates);
+                }
+
+                // Fetch and return the updated book
+                return await GetByIdAsync(existingBook.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error patching book by ISBN {Isbn}", isbn);
+                throw;
+            }
+        }
     }
 }

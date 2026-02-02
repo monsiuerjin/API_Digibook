@@ -291,6 +291,77 @@ namespace API_DigiBook.Controllers
         }
 
         /// <summary>
+        /// Partially update an existing book by ISBN (PATCH)
+        /// Only provided fields will be updated
+        /// </summary>
+        [HttpPatch("isbn/{isbn}")]
+        public async Task<IActionResult> PatchBook(string isbn, [FromBody] BookPatchDto patchDto)
+        {
+            try
+            {
+                // Validate that at least one field is provided
+                var properties = typeof(BookPatchDto).GetProperties();
+                var hasAnyValue = properties.Any(p => p.GetValue(patchDto) != null);
+
+                if (!hasAnyValue)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "At least one field must be provided for partial update"
+                    });
+                }
+
+                var updatedBook = await _bookRepository.PatchByIsbnAsync(isbn, patchDto);
+
+                if (updatedBook == null)
+                {
+                    await _systemLogger.LogWarningAsync(
+                        "PATCH_BOOK",
+                        $"Attempted to patch non-existent book with ISBN: {isbn}",
+                        "Admin"
+                    );
+
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Book with ISBN '{isbn}' not found"
+                    });
+                }
+
+                await _systemLogger.LogSuccessAsync(
+                    "PATCH_BOOK",
+                    $"Book partially updated: {updatedBook.Title} (ISBN: {isbn})",
+                    "Admin"
+                );
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Book partially updated successfully",
+                    data = updatedBook
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error patching book with ISBN: {Isbn}", isbn);
+                
+                await _systemLogger.LogErrorAsync(
+                    "PATCH_BOOK",
+                    $"Error patching book with ISBN '{isbn}': {ex.Message}",
+                    "Admin"
+                );
+
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error patching book",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
         /// Delete a book by ISBN
         /// </summary>
         [HttpDelete("isbn/{isbn}")]

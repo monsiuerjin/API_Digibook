@@ -14,5 +14,6 @@ namespace API_DigiBook.Interfaces.Repositories
         Task<IEnumerable<Book>> GetByIdsAsync(IEnumerable<string> bookIds);
         Task<bool> UpdateByIsbnAsync(string isbn, Book book);
         Task<bool> DeleteByIsbnAsync(string isbn);
+        Task<Book?> PatchByIsbnAsync(string isbn, BookPatchDto patchDto);
     }
 }
