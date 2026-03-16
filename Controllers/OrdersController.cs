@@ -4,6 +4,9 @@ using API_DigiBook.Models;
 using API_DigiBook.Interfaces.Repositories;
 using API_DigiBook.Commands;
 using API_DigiBook.Commands.Orders;
+using API_DigiBook.Notifications;
+using API_DigiBook.Notifications.Contracts;
+using API_DigiBook.Notifications.Models;
 
 namespace API_DigiBook.Controllers
 {
@@ -14,15 +17,18 @@ namespace API_DigiBook.Controllers
         private readonly IOrderRepository _orderRepository;
         private readonly ILogger<OrdersController> _logger;
         private readonly CommandInvoker _commandInvoker;
+        private readonly INotificationPublisher _notificationPublisher;
 
         public OrdersController(
             IOrderRepository orderRepository, 
             ILogger<OrdersController> logger,
-            CommandInvoker commandInvoker)
+            CommandInvoker commandInvoker,
+            INotificationPublisher notificationPublisher)
         {
             _orderRepository = orderRepository;
             _logger = logger;
             _commandInvoker = commandInvoker;
+            _notificationPublisher = notificationPublisher;
         }
 
         /// <summary>
@@ -190,6 +196,13 @@ namespace API_DigiBook.Controllers
             if (result.Success)
             {
                 var createdOrder = result.Data as Order;
+
+                if (createdOrder != null)
+                {
+                    var notificationEvent = NotificationEventFactory.ForOrderCreated(createdOrder);
+                    await PublishSafelyAsync(notificationEvent);
+                }
+
                 return CreatedAtAction(nameof(GetOrderById), new { id = createdOrder?.Id }, new
                 {
                     success = true,
@@ -249,6 +262,8 @@ namespace API_DigiBook.Controllers
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateOrderStatus(string id, [FromBody] UpdateStatusRequest request)
         {
+            var previousOrder = await _orderRepository.GetByIdAsync(id);
+
             var command = new UpdateOrderStatusCommand(
                 id, 
                 request.Status, 
@@ -260,6 +275,13 @@ namespace API_DigiBook.Controllers
 
             if (result.Success)
             {
+                var updatedOrder = await _orderRepository.GetByIdAsync(id);
+                if (updatedOrder != null)
+                {
+                    var notificationEvent = NotificationEventFactory.ForOrderStatusChanged(updatedOrder, previousOrder?.Status);
+                    await PublishSafelyAsync(notificationEvent);
+                }
+
                 return Ok(new
                 {
                     success = true,
@@ -283,6 +305,22 @@ namespace API_DigiBook.Controllers
                 message = result.Message,
                 error = result.Error
             });
+        }
+
+        private async Task PublishSafelyAsync(NotificationEvent notificationEvent)
+        {
+            try
+            {
+                await _notificationPublisher.PublishAsync(notificationEvent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Notification publish failed for EventType={EventType}, EventId={EventId}",
+                    notificationEvent.EventType,
+                    notificationEvent.EventId);
+            }
         }
 
         /// <summary>

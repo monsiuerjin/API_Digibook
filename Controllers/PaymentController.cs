@@ -3,6 +3,9 @@ using API_DigiBook.Models;
 using API_DigiBook.Repositories;
 using API_DigiBook.Interfaces.Repositories;
 using API_DigiBook.Services;
+using API_DigiBook.Notifications;
+using API_DigiBook.Notifications.Contracts;
+using API_DigiBook.Notifications.Models;
 using Google.Cloud.Firestore;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,15 +19,18 @@ namespace API_DigiBook.Controllers
         private readonly IOrderRepository _orderRepository;
         private readonly FirestoreDb _db;
         private readonly ILogger<PaymentController> _logger;
+        private readonly INotificationPublisher _notificationPublisher;
 
         public PaymentController(
             PaymentServiceFactory paymentFactory,
             IOrderRepository orderRepository,
+            INotificationPublisher notificationPublisher,
             ILogger<PaymentController> logger)
         {
             _paymentFactory = paymentFactory;
             _orderRepository = orderRepository;
             _db = FirebaseService.GetFirestoreDb();
+            _notificationPublisher = notificationPublisher;
             _logger = logger;
         }
 
@@ -182,6 +188,9 @@ namespace API_DigiBook.Controllers
                         transaction.UpdatedAt = Timestamp.GetCurrentTimestamp();
                         await _db.Collection("PaymentTransactions").Document(doc.Id).SetAsync(transaction);
                     }
+
+                    var notificationEvent = NotificationEventFactory.ForPaymentPaid(order);
+                    await PublishSafelyAsync(notificationEvent);
                 }
 
                 return Ok(verification);
@@ -251,6 +260,12 @@ namespace API_DigiBook.Controllers
 
                     order.UpdatedAt = Timestamp.GetCurrentTimestamp();
                     await _orderRepository.UpdateAsync(order.Id, order);
+
+                    if (status == "PAID")
+                    {
+                        var notificationEvent = NotificationEventFactory.ForPaymentPaid(order);
+                        await PublishSafelyAsync(notificationEvent);
+                    }
                 }
 
                 return Ok(new { message = "Webhook processed successfully" });
@@ -259,6 +274,22 @@ namespace API_DigiBook.Controllers
             {
                 _logger.LogError(ex, "Error processing webhook");
                 return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+
+        private async Task PublishSafelyAsync(NotificationEvent notificationEvent)
+        {
+            try
+            {
+                await _notificationPublisher.PublishAsync(notificationEvent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Notification publish failed for EventType={EventType}, EventId={EventId}",
+                    notificationEvent.EventType,
+                    notificationEvent.EventId);
             }
         }
     }

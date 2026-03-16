@@ -17,6 +17,9 @@ namespace API_DigiBook.Models
         [FirestoreProperty("phone")]
         public string Phone { get; set; } = string.Empty;
 
+        [FirestoreProperty("telegramChatId")]
+        public string TelegramChatId { get; set; } = string.Empty;
+
         [FirestoreProperty("addresses")]
         public List<Address> Addresses { get; set; } = new List<Address>();
 
