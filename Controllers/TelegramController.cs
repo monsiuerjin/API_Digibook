@@ -32,89 +32,116 @@ namespace API_DigiBook.Controllers
         [HttpPost("link-token")]
         public async Task<IActionResult> CreateLinkToken([FromBody] CreateTelegramLinkTokenRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.UserId))
+            try
             {
-                return BadRequest(new { message = "UserId is required" });
+                if (string.IsNullOrWhiteSpace(request.UserId))
+                {
+                    return BadRequest(new { message = "UserId is required" });
+                }
+
+                if (string.IsNullOrWhiteSpace(_notificationOptions.Telegram.BotUsername))
+                {
+                    return BadRequest(new { message = "Telegram BotUsername is not configured" });
+                }
+
+                var user = await _userRepository.GetByIdAsync(request.UserId);
+                if (user == null)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                var token = Guid.NewGuid().ToString("N");
+                var expiresAtUtc = DateTime.UtcNow.AddMinutes(10);
+
+                var linkToken = new TelegramLinkToken
+                {
+                    Id = token,
+                    Token = token,
+                    UserId = request.UserId,
+                    IsUsed = false,
+                    ExpiresAt = Timestamp.FromDateTime(expiresAtUtc),
+                    CreatedAt = Timestamp.GetCurrentTimestamp()
+                };
+
+                await _db.Collection("telegramLinkTokens").Document(token).SetAsync(linkToken);
+
+                var startLink = $"https://t.me/{_notificationOptions.Telegram.BotUsername}?start={token}";
+                return Ok(new
+                {
+                    token,
+                    startLink,
+                    expiresAtUtc
+                });
             }
-
-            if (string.IsNullOrWhiteSpace(_notificationOptions.Telegram.BotUsername))
+            catch (Exception ex)
             {
-                return BadRequest(new { message = "Telegram BotUsername is not configured" });
+                _logger.LogError(ex, "Error creating Telegram link token for user {UserId}", request.UserId);
+                return StatusCode(500, new { message = "Error creating Telegram link token", error = ex.Message });
             }
-
-            var user = await _userRepository.GetByIdAsync(request.UserId);
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found" });
-            }
-
-            var token = Guid.NewGuid().ToString("N");
-            var expiresAtUtc = DateTime.UtcNow.AddMinutes(10);
-
-            var linkToken = new TelegramLinkToken
-            {
-                Id = token,
-                Token = token,
-                UserId = request.UserId,
-                IsUsed = false,
-                ExpiresAt = Timestamp.FromDateTime(expiresAtUtc),
-                CreatedAt = Timestamp.GetCurrentTimestamp()
-            };
-
-            await _db.Collection("telegramLinkTokens").Document(token).SetAsync(linkToken);
-
-            var startLink = $"https://t.me/{_notificationOptions.Telegram.BotUsername}?start={token}";
-            return Ok(new
-            {
-                token,
-                startLink,
-                expiresAtUtc
-            });
         }
 
         [HttpGet("link-status/{userId}")]
         public async Task<IActionResult> GetLinkStatus(string userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
+            try
             {
-                return NotFound(new { message = "User not found" });
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                // Firestore inequality + orderBy can require index and fail in production.
+                // Query the small pending set first, then filter by expiry in memory.
+                var pendingQuery = _db.Collection("telegramLinkTokens")
+                    .WhereEqualTo("userId", userId)
+                    .WhereEqualTo("isUsed", false)
+                    .Limit(20);
+
+                var pendingSnapshot = await pendingQuery.GetSnapshotAsync();
+                var pendingToken = pendingSnapshot.Documents
+                    .Select(x => x.ConvertTo<TelegramLinkToken>())
+                    .Where(x => x.ExpiresAt.ToDateTime() > DateTime.UtcNow)
+                    .OrderByDescending(x => x.CreatedAt.ToDateTime())
+                    .FirstOrDefault();
+
+                return Ok(new
+                {
+                    isLinked = !string.IsNullOrWhiteSpace(user.TelegramChatId),
+                    telegramChatId = user.TelegramChatId,
+                    hasPendingToken = pendingToken != null,
+                    pendingTokenExpiresAt = pendingToken?.ExpiresAt.ToDateTime()
+                });
             }
-
-            var now = Timestamp.FromDateTime(DateTime.UtcNow);
-            var pendingQuery = _db.Collection("telegramLinkTokens")
-                .WhereEqualTo("userId", userId)
-                .WhereEqualTo("isUsed", false)
-                .WhereGreaterThan("expiresAt", now)
-                .OrderByDescending("createdAt")
-                .Limit(1);
-
-            var pendingSnapshot = await pendingQuery.GetSnapshotAsync();
-            var pendingToken = pendingSnapshot.Documents.FirstOrDefault()?.ConvertTo<TelegramLinkToken>();
-
-            return Ok(new
+            catch (Exception ex)
             {
-                isLinked = !string.IsNullOrWhiteSpace(user.TelegramChatId),
-                telegramChatId = user.TelegramChatId,
-                hasPendingToken = pendingToken != null,
-                pendingTokenExpiresAt = pendingToken?.ExpiresAt.ToDateTime()
-            });
+                _logger.LogError(ex, "Error retrieving Telegram link status for user {UserId}", userId);
+                return StatusCode(500, new { message = "Error retrieving Telegram link status", error = ex.Message });
+            }
         }
 
         [HttpDelete("unlink/{userId}")]
         public async Task<IActionResult> Unlink(string userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
+            try
             {
-                return NotFound(new { message = "User not found" });
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                user.TelegramChatId = string.Empty;
+                user.UpdatedAt = Timestamp.GetCurrentTimestamp();
+                await _userRepository.UpdateAsync(userId, user);
+
+                return Ok(new { message = "Telegram unlinked successfully" });
             }
-
-            user.TelegramChatId = string.Empty;
-            user.UpdatedAt = Timestamp.GetCurrentTimestamp();
-            await _userRepository.UpdateAsync(userId, user);
-
-            return Ok(new { message = "Telegram unlinked successfully" });
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error unlinking Telegram for user {UserId}", userId);
+                return StatusCode(500, new { message = "Error unlinking Telegram", error = ex.Message });
+            }
         }
 
         [HttpPost("webhook")]
