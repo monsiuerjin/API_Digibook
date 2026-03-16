@@ -12,6 +12,8 @@ namespace API_DigiBook
     {
         public static void Main(string[] args)
         {
+            const string frontendCorsPolicy = "FrontendCorsPolicy";
+
             // Load environment variables from .env file
             try
             {
@@ -66,13 +68,26 @@ namespace API_DigiBook
             builder.Services.AddScoped<API_DigiBook.Commands.CommandInvoker>();
             
             // Add CORS policy
+            var allowedOrigins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("AllowAll", builder =>
+                options.AddPolicy(frontendCorsPolicy, corsBuilder =>
                 {
-                    builder.AllowAnyOrigin()
-                           .AllowAnyMethod()
-                           .AllowAnyHeader();
+                    if (allowedOrigins.Length > 0)
+                    {
+                        corsBuilder.WithOrigins(allowedOrigins)
+                            .AllowAnyMethod()
+                            .AllowAnyHeader();
+                        return;
+                    }
+
+                    // Fallback for quick troubleshooting when explicit origins are not configured.
+                    corsBuilder.SetIsOriginAllowed(_ => true)
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
                 });
             });
 
@@ -90,7 +105,7 @@ namespace API_DigiBook
             }
 
             // Use CORS
-            app.UseCors("AllowAll");
+            app.UseCors(frontendCorsPolicy);
 
             app.UseAuthorization();
 
