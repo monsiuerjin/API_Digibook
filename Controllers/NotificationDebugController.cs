@@ -32,6 +32,10 @@ namespace API_DigiBook.Controllers
         {
             var rawPassword = _notificationOptions.Email.AppPassword ?? string.Empty;
             var normalizedPassword = new string(rawPassword.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var gmailApiClientId = Environment.GetEnvironmentVariable("GmailApi__ClientId") ?? string.Empty;
+            var gmailApiClientSecret = Environment.GetEnvironmentVariable("GmailApi__ClientSecret") ?? string.Empty;
+            var gmailApiRefreshToken = Environment.GetEnvironmentVariable("GmailApi__RefreshToken") ?? string.Empty;
+            var gmailApiFromEmail = Environment.GetEnvironmentVariable("GmailApi__FromEmail") ?? string.Empty;
 
             return Ok(new
             {
@@ -48,6 +52,10 @@ namespace API_DigiBook.Controllers
                     fromName = _notificationOptions.Email.FromName,
                     resendBaseUrl = _notificationOptions.Email.Resend.BaseUrl,
                     hasResendApiKey = !string.IsNullOrWhiteSpace(_notificationOptions.Email.Resend.ApiKey),
+                    hasGmailApiClientId = !string.IsNullOrWhiteSpace(gmailApiClientId),
+                    hasGmailApiClientSecret = !string.IsNullOrWhiteSpace(gmailApiClientSecret),
+                    hasGmailApiRefreshToken = !string.IsNullOrWhiteSpace(gmailApiRefreshToken),
+                    hasGmailApiFromEmail = !string.IsNullOrWhiteSpace(gmailApiFromEmail),
                     rawPasswordLength = rawPassword.Length,
                     normalizedPasswordLength = normalizedPassword.Length,
                     hasPassword = !string.IsNullOrWhiteSpace(normalizedPassword)

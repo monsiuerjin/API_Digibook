@@ -58,7 +58,16 @@ namespace API_DigiBook
 
             // Register Notification services (Observer Pattern)
             builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection("Notification"));
+            builder.Services.Configure<GmailApiOptions>(builder.Configuration.GetSection("GmailApi"));
             builder.Services.AddHttpClient<TelegramNotificationChannel>();
+            builder.Services.AddHttpClient<GmailApiEmailNotificationChannel>((sp, client) =>
+            {
+                var notificationOptions = sp
+                    .GetRequiredService<Microsoft.Extensions.Options.IOptions<NotificationOptions>>()
+                    .Value;
+
+                client.Timeout = TimeSpan.FromMilliseconds(Math.Max(1000, notificationOptions.Email.TimeoutMilliseconds));
+            });
             builder.Services.AddHttpClient<ResendEmailNotificationChannel>((sp, client) =>
             {
                 var notificationOptions = sp
