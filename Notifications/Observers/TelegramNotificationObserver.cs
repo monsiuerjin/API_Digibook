@@ -5,6 +5,8 @@ using API_DigiBook.Notifications.Contracts;
 using API_DigiBook.Notifications.Models;
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Options;
+using System.Globalization;
+using System.Net;
 
 namespace API_DigiBook.Notifications.Observers
 {
@@ -122,16 +124,55 @@ namespace API_DigiBook.Notifications.Observers
 
         private static string BuildTelegramMessage(NotificationEvent notificationEvent)
         {
+            var orderId = Safe(notificationEvent.OrderId, "N/A");
+            var status = Safe(notificationEvent.NewStatus, "Dang xu ly");
+            var oldStatus = Safe(notificationEvent.OldStatus, "N/A");
+            var customerName = Safe(notificationEvent.CustomerName, "Khach hang");
+            var paymentMethod = Safe(notificationEvent.PaymentMethod, "N/A");
+            var paymentStatus = Safe(notificationEvent.PaymentStatus, "N/A");
+            var itemSummary = Safe(notificationEvent.ItemSummary, "Khong co san pham");
+            var customerAddress = Safe(notificationEvent.CustomerAddress, "N/A");
+
+            var headline = notificationEvent.EventType switch
+            {
+                NotificationEventTypes.OrderCreated => "Thong bao don hang moi",
+                NotificationEventTypes.PaymentPaid => "Thong bao thanh toan thanh cong",
+                NotificationEventTypes.OrderStatusChanged => "Thong bao cap nhat trang thai",
+                _ => "Thong bao DigiBook"
+            };
+
+            var statusLine = notificationEvent.EventType switch
+            {
+                NotificationEventTypes.OrderStatusChanged => $"<b>Trang thai:</b> {oldStatus} -> {status}",
+                _ => $"<b>Trang thai:</b> {status}"
+            };
+
             return notificationEvent.EventType switch
             {
-                NotificationEventTypes.OrderCreated =>
-                    $"DigiBook: Don hang {notificationEvent.OrderId} da duoc tao. Trang thai: {notificationEvent.NewStatus ?? "Dang xu ly"}.",
-                NotificationEventTypes.PaymentPaid =>
-                    $"DigiBook: Don hang {notificationEvent.OrderId} da thanh toan thanh cong.",
-                NotificationEventTypes.OrderStatusChanged =>
-                    $"DigiBook: Don hang {notificationEvent.OrderId} cap nhat tu {notificationEvent.OldStatus ?? "N/A"} sang {notificationEvent.NewStatus ?? "N/A"}.",
-                _ => "DigiBook: Ban co thong bao moi."
+                NotificationEventTypes.OrderCreated or NotificationEventTypes.PaymentPaid or NotificationEventTypes.OrderStatusChanged =>
+                    $"<b>DigiBook | {headline}</b>\n" +
+                    $"<b>Ma don:</b> <code>{orderId}</code>\n" +
+                    $"{statusLine}\n" +
+                    $"<b>Khach hang:</b> {customerName}\n" +
+                    $"<b>Thanh toan:</b> {paymentMethod} ({paymentStatus})\n" +
+                    $"<b>So san pham:</b> {notificationEvent.ItemCount}\n" +
+                    $"<b>Tong tien:</b> {FormatMoney(notificationEvent.Total)}\n" +
+                    $"<b>San pham:</b> {itemSummary}\n" +
+                    $"<b>Dia chi:</b> {customerAddress}",
+                _ => "<b>DigiBook</b>\nBan co thong bao moi."
             };
+        }
+
+        private static string FormatMoney(double amount)
+        {
+            return string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} VND", amount);
+        }
+
+        private static string Safe(string? value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? fallback
+                : WebUtility.HtmlEncode(value.Trim());
         }
 
         private static string BuildIdempotencyKey(NotificationEvent notificationEvent, string channel, string recipient)
