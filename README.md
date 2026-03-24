@@ -101,7 +101,12 @@ dotnet restore
    FIREBASE_PROJECT_ID=your-project-id-here
    FIREBASE_CREDENTIAL_PATH=firebase-credentials.json
    ASPNETCORE_ENVIRONMENT=Development
+  GEMINI_API_KEY=your-google-ai-studio-key
    ```
+
+3. Chatbot backend (`POST /api/chat/recommend`) sẽ tự đọc API key theo thứ tự ưu tiên:
+  - `Chatbot:GeminiApiKey` (từ config binding)
+  - `GEMINI_API_KEY` (biến môi trường)
 
 **Lưu ý:** 
 - File `.env` và `firebase-credentials.json` đã được thêm vào `.gitignore` để bảo mật

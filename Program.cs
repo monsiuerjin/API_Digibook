@@ -5,6 +5,9 @@ using API_DigiBook.Notifications.Channels;
 using API_DigiBook.Notifications.Configuration;
 using API_DigiBook.Notifications.Contracts;
 using API_DigiBook.Notifications.Observers;
+using API_DigiBook.Interfaces.Services;
+using API_DigiBook.Models;
+using API_DigiBook.Services.Chat;
 
 namespace API_DigiBook
 {
@@ -93,6 +96,12 @@ namespace API_DigiBook
             
             // Register Command Pattern services
             builder.Services.AddScoped<API_DigiBook.Commands.CommandInvoker>();
+
+            // Register Chatbot services
+            builder.Services.AddMemoryCache();
+            builder.Services.Configure<ChatbotOptions>(builder.Configuration.GetSection("Chatbot"));
+            builder.Services.AddScoped<IChatRecommendationService, ChatRecommendationService>();
+            builder.Services.AddHttpClient<IGeminiClient, GeminiClient>();
             
             // Add CORS policy
             var allowedOrigins = builder.Configuration
