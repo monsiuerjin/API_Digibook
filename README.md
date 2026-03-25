@@ -17,7 +17,7 @@ API đã được **hoàn toàn đồng bộ** với models của DigiBook front
 
 ## 🎯 Design Patterns
 
-API được xây dựng với kiến trúc chuẩn, áp dụng **5 Design Patterns** chính để đảm bảo code clean, dễ bảo trì và mở rộng:
+API được xây dựng với kiến trúc chuẩn, áp dụng **7 Design Patterns** chính để đảm bảo code clean, dễ bảo trì và mở rộng:
 
 ### 1. 📦 Repository Pattern
 - **Vị trí:** Thư mục `Repositories/` và `Interfaces/Repositories/`
@@ -61,6 +61,22 @@ API được xây dựng với kiến trúc chuẩn, áp dụng **5 Design Patte
   - `PricingContext` tự động chọn chiến lược dựa trên `membershipTier` của user.
   - Endpoint chính: `POST /api/pricing/calculate-for-user/{userId}`
 - **Lợi ích:** Tách biệt thuật toán tính giá khỏi class sử dụng nó. Dễ dàng chuyển đổi chiến lược tính giá ngay trong lúc ứng dụng đang chạy (runtime).
+
+### 6. 🏭 Factory Pattern
+- **Vị trí:** Thư mục `Factories/`
+- **Mục đích:** Cung cấp một interface để tạo ra các đối tượng trong một super-class, nhưng cho phép các sub-classes thay đổi loại đối tượng sẽ được tạo.
+- **Chi tiết:**
+  - `PaymentServiceFactory` chịu trách nhiệm khởi tạo các dịch vụ thanh toán (ví dụ: PayOS).
+  - Tự động quyết định service nào được gọi dựa trên phương thức thanh toán được chọn.
+- **Lợi ích:** Giảm sự phụ thuộc (coupling) giữa hệ thống và các cổng thanh toán cụ thể. Dễ dàng tích hợp thêm các cổng thanh toán mới (VNPay, Momo, ZaloPay) trong tương lai mà không cần sửa đổi code hiện tại.
+
+### 7. 📡 Observer Pattern
+- **Vị trí:** Thư mục `Notifications/` (đặc biệt là `Observers/`)
+- **Mục đích:** Định nghĩa mối phụ thuộc một-nhiều giữa các đối tượng để khi một đối tượng thay đổi trạng thái, tất cả các đối tượng phụ thuộc của nó sẽ được thông báo và cập nhật tự động.
+- **Chi tiết:**
+  - Hệ thống Notification với `EmailNotificationObserver` và `TelegramNotificationObserver`.
+  - Lắng nghe các sự kiện hệ thống (ví dụ: tạo đơn hàng thành công, thanh toán thành công).
+- **Lợi ích:** Tách biệt logic gửi thông báo khỏi logic xử lý nghiệp vụ chính (như tạo Order). Dễ dàng thêm các kênh thông báo mới (SMS, Push Notification) chỉ bằng cách tạo thêm Observer mới.
 
 ## 📋 Yêu cầu hệ thống
 
