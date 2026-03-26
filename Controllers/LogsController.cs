@@ -186,16 +186,33 @@ namespace API_DigiBook.Controllers
         /// Delete old logs (older than specified days)
         /// </summary>
         [HttpDelete("cleanup")]
-        public async Task<IActionResult> CleanupOldLogs([FromQuery] int days = 30)
+        public async Task<IActionResult> CleanupOldLogs([FromQuery] int? days = null, [FromQuery] string? beforeDate = null)
         {
             try
             {
-                var deletedCount = await _logger.DeleteOldLogsAsync(days);
+                int daysToUse = days ?? 30;
+                if (!string.IsNullOrWhiteSpace(beforeDate))
+                {
+                    if (!DateTime.TryParse(beforeDate, out var parsedDate))
+                    {
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "Invalid beforeDate format"
+                        });
+                    }
+
+                    var diff = DateTime.UtcNow.Date - parsedDate.ToUniversalTime().Date;
+                    daysToUse = Math.Max(0, (int)Math.Ceiling(diff.TotalDays));
+                }
+
+                var deletedCount = await _logger.DeleteOldLogsAsync(daysToUse);
 
                 return Ok(new
                 {
                     success = true,
                     message = $"Deleted {deletedCount} old logs",
+                    data = new { deletedCount = deletedCount },
                     deletedCount = deletedCount
                 });
             }

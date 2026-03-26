@@ -8,6 +8,8 @@ using API_DigiBook.Notifications.Observers;
 using API_DigiBook.Interfaces.Services;
 using API_DigiBook.Models;
 using API_DigiBook.Services.Chat;
+using API_DigiBook.Converters;
+using System.Text.Json;
 
 namespace API_DigiBook
 {
@@ -43,7 +45,12 @@ namespace API_DigiBook
             }
 
             // Add services to the container
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new FirestoreTimestampConverter());
+                    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                });
             
             // Register Repositories
             builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IBookRepository, API_DigiBook.Repositories.BookRepository>();
@@ -99,6 +106,7 @@ namespace API_DigiBook
 
             // Register Chatbot services
             builder.Services.AddMemoryCache();
+            builder.Services.AddSingleton<ICacheService, CacheService>();
             builder.Services.Configure<ChatbotOptions>(builder.Configuration.GetSection("Chatbot"));
             builder.Services.AddScoped<IChatRecommendationService, ChatRecommendationService>();
             builder.Services.AddHttpClient<IGeminiClient, GeminiClient>();

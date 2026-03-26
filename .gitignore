@@ -208,10 +208,15 @@ FodyWeavers.xsd
 
 # Environment files
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Configuration files
+appsettings.Local.json
+appsettings.Development.json
 
 # Firebase credentials
 firebase-credentials.json

@@ -127,6 +127,35 @@ namespace API_DigiBook.Controllers
         }
 
         /// <summary>
+        /// Check if user purchased a specific book
+        /// </summary>
+        [HttpGet("user/{userId}/purchased/{bookId}")]
+        public async Task<IActionResult> HasPurchasedBook(string userId, string bookId)
+        {
+            try
+            {
+                var orders = await _orderRepository.GetByUserIdAsync(userId);
+                var purchased = orders.Any(o => o.Items != null && o.Items.Any(i => i.BookId == bookId));
+
+                return Ok(new
+                {
+                    success = true,
+                    data = new { purchased }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking purchase for user {UserId} and book {BookId}", userId, bookId);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error checking purchase",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
         /// Get orders by status
         /// </summary>
         [HttpGet("status/{status}")]

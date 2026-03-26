@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Google.Cloud.Firestore;
 using API_DigiBook.Models;
 using API_DigiBook.Interfaces.Repositories;
+using API_DigiBook.Services;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace API_DigiBook.Controllers
 {
@@ -11,11 +13,16 @@ namespace API_DigiBook.Controllers
     {
         private readonly ICouponRepository _couponRepository;
         private readonly ILogger<CouponsController> _logger;
+        private readonly IMemoryCache _cache;
 
-        public CouponsController(ICouponRepository couponRepository, ILogger<CouponsController> logger)
+        private const int CacheMinutes = 2;
+        private const string CouponsVersionKey = "cache:coupons:version";
+
+        public CouponsController(ICouponRepository couponRepository, ILogger<CouponsController> logger, IMemoryCache cache)
         {
             _couponRepository = couponRepository;
             _logger = logger;
+            _cache = cache;
         }
 
         /// <summary>
@@ -26,12 +33,19 @@ namespace API_DigiBook.Controllers
         {
             try
             {
-                var coupons = await _couponRepository.GetAllAsync();
+                var version = GetCacheVersion(CouponsVersionKey);
+                var cacheKey = $"cache:coupons:all:{version}";
+                if (!_cache.TryGetValue(cacheKey, out List<Coupon>? coupons))
+                {
+                    coupons = (await _couponRepository.GetAllAsync()).ToList();
+                    _cache.Set(cacheKey, coupons, TimeSpan.FromMinutes(CacheMinutes));
+                    CacheReadMonitor.Record("coupons:all", _logger);
+                }
 
                 return Ok(new
                 {
                     success = true,
-                    count = coupons.Count(),
+                    count = coupons.Count,
                     data = coupons
                 });
             }
@@ -129,12 +143,19 @@ namespace API_DigiBook.Controllers
         {
             try
             {
-                var coupons = await _couponRepository.GetActiveAsync();
+                var version = GetCacheVersion(CouponsVersionKey);
+                var cacheKey = $"cache:coupons:active:{version}";
+                if (!_cache.TryGetValue(cacheKey, out List<Coupon>? coupons))
+                {
+                    coupons = (await _couponRepository.GetActiveAsync()).ToList();
+                    _cache.Set(cacheKey, coupons, TimeSpan.FromMinutes(CacheMinutes));
+                    CacheReadMonitor.Record("coupons:active", _logger);
+                }
 
                 return Ok(new
                 {
                     success = true,
-                    count = coupons.Count(),
+                    count = coupons.Count,
                     data = coupons
                 });
             }
@@ -270,6 +291,7 @@ namespace API_DigiBook.Controllers
                 }
 
                 await _couponRepository.AddAsync(coupon, coupon.Id);
+                BumpCacheVersion(CouponsVersionKey);
 
                 return CreatedAtAction(nameof(GetCouponById), new { id = coupon.Id }, new
                 {
@@ -312,6 +334,8 @@ namespace API_DigiBook.Controllers
                     });
                 }
 
+                BumpCacheVersion(CouponsVersionKey);
+
                 return Ok(new
                 {
                     success = true,
@@ -350,6 +374,8 @@ namespace API_DigiBook.Controllers
                     });
                 }
 
+                BumpCacheVersion(CouponsVersionKey);
+
                 return Ok(new
                 {
                     success = true,
@@ -387,6 +413,7 @@ namespace API_DigiBook.Controllers
                 }
 
                 await _couponRepository.IncrementUsageAsync(id);
+                BumpCacheVersion(CouponsVersionKey);
 
                 return Ok(new
                 {
@@ -426,6 +453,7 @@ namespace API_DigiBook.Controllers
 
                 coupon.IsActive = !coupon.IsActive;
                 await _couponRepository.UpdateAsync(id, coupon);
+                BumpCacheVersion(CouponsVersionKey);
 
                 return Ok(new
                 {
@@ -444,6 +472,22 @@ namespace API_DigiBook.Controllers
                     error = ex.Message
                 });
             }
+        }
+
+        private string GetCacheVersion(string key)
+        {
+            if (!_cache.TryGetValue(key, out string? version) || string.IsNullOrWhiteSpace(version))
+            {
+                version = Guid.NewGuid().ToString("N");
+                _cache.Set(key, version, TimeSpan.FromMinutes(CacheMinutes));
+            }
+
+            return version;
+        }
+
+        private void BumpCacheVersion(string key)
+        {
+            _cache.Set(key, Guid.NewGuid().ToString("N"), TimeSpan.FromMinutes(CacheMinutes));
         }
     }
 

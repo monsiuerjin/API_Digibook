@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using API_DigiBook.Models;
 using API_DigiBook.Interfaces.Repositories;
+using System.Text.Json;
+using API_DigiBook.Services;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace API_DigiBook.Controllers
 {
@@ -10,11 +13,16 @@ namespace API_DigiBook.Controllers
     {
         private readonly ICategoryRepository _categoryRepository;
         private readonly ILogger<CategoriesController> _logger;
+        private readonly IMemoryCache _cache;
 
-        public CategoriesController(ICategoryRepository categoryRepository, ILogger<CategoriesController> logger)
+        private const int CacheMinutes = 2;
+        private const string CategoriesVersionKey = "cache:categories:version";
+
+        public CategoriesController(ICategoryRepository categoryRepository, ILogger<CategoriesController> logger, IMemoryCache cache)
         {
             _categoryRepository = categoryRepository;
             _logger = logger;
+            _cache = cache;
         }
 
         /// <summary>
@@ -25,12 +33,19 @@ namespace API_DigiBook.Controllers
         {
             try
             {
-                var categories = await _categoryRepository.GetAllAsync();
+                var version = GetCacheVersion(CategoriesVersionKey);
+                var cacheKey = $"cache:categories:all:{version}";
+                if (!_cache.TryGetValue(cacheKey, out List<Category>? categories))
+                {
+                    categories = (await _categoryRepository.GetAllAsync()).ToList();
+                    _cache.Set(cacheKey, categories, TimeSpan.FromMinutes(CacheMinutes));
+                    CacheReadMonitor.Record("categories:all", _logger);
+                }
                 
                 return Ok(new
                 {
                     success = true,
-                    count = categories.Count(),
+                    count = categories.Count,
                     data = categories
                 });
             }
@@ -113,6 +128,7 @@ namespace API_DigiBook.Controllers
 
                 // Use name as document ID
                 await _categoryRepository.AddAsync(category, category.Name);
+                BumpCacheVersion(CategoriesVersionKey);
 
                 return CreatedAtAction(nameof(GetCategoryByName), new { name = category.Name }, new
                 {
@@ -152,6 +168,8 @@ namespace API_DigiBook.Controllers
                     });
                 }
 
+                BumpCacheVersion(CategoriesVersionKey);
+
                 return Ok(new
                 {
                     success = true,
@@ -190,6 +208,8 @@ namespace API_DigiBook.Controllers
                     });
                 }
 
+                BumpCacheVersion(CategoriesVersionKey);
+
                 return Ok(new
                 {
                     success = true,
@@ -206,6 +226,103 @@ namespace API_DigiBook.Controllers
                     error = ex.Message
                 });
             }
+        }
+
+        /// <summary>
+        /// Bulk delete categories
+        /// </summary>
+        [HttpPost("bulk-delete")]
+        public async Task<IActionResult> BulkDelete([FromBody] JsonElement body)
+        {
+            try
+            {
+                var names = ExtractNames(body);
+                if (names.Count == 0)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Category names are required"
+                    });
+                }
+
+                int deletedCount = 0;
+                foreach (var name in names)
+                {
+                    if (await _categoryRepository.DeleteAsync(name))
+                    {
+                        deletedCount++;
+                    }
+                }
+
+                if (deletedCount > 0)
+                {
+                    BumpCacheVersion(CategoriesVersionKey);
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Deleted {deletedCount} categories",
+                    data = new { deletedCount }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error bulk deleting categories");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error deleting categories",
+                    error = ex.Message
+                });
+            }
+        }
+
+        private static List<string> ExtractNames(JsonElement body)
+        {
+            var names = new List<string>();
+            if (body.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in body.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                    {
+                        names.Add(item.GetString()!);
+                    }
+                }
+            }
+            else if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("names", out var namesElement))
+            {
+                if (namesElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in namesElement.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                        {
+                            names.Add(item.GetString()!);
+                        }
+                    }
+                }
+            }
+
+            return names;
+        }
+
+        private string GetCacheVersion(string key)
+        {
+            if (!_cache.TryGetValue(key, out string? version) || string.IsNullOrWhiteSpace(version))
+            {
+                version = Guid.NewGuid().ToString("N");
+                _cache.Set(key, version, TimeSpan.FromMinutes(CacheMinutes));
+            }
+
+            return version;
+        }
+
+        private void BumpCacheVersion(string key)
+        {
+            _cache.Set(key, Guid.NewGuid().ToString("N"), TimeSpan.FromMinutes(CacheMinutes));
         }
     }
 }

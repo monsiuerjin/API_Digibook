@@ -5,6 +5,7 @@ using API_DigiBook.Interfaces.Repositories;
 using API_DigiBook.Decorator;
 using API_DigiBook.Decorator.Decorators;
 using API_DigiBook.Singleton;
+using System.Text.Json;
 
 namespace API_DigiBook.Controllers
 {
@@ -160,33 +161,62 @@ namespace API_DigiBook.Controllers
         /// Example: Black Friday Sale
         /// </summary>
         [HttpPost("black-friday")]
-        public async Task<IActionResult> BlackFridaySale([FromBody] SimpleDiscountRequest request)
+        public async Task<IActionResult> BlackFridaySale([FromBody] JsonElement request)
         {
             try
             {
-                IPriceCalculator calculator = new BasePriceCalculator(request.Price, request.ItemName);
-                
+                if (request.ValueKind == JsonValueKind.Object && request.TryGetProperty("items", out var itemsElement))
+                {
+                    var items = ParseBlackFridayItems(itemsElement);
+                    var originalTotal = items.Sum(i => i.Price * i.Quantity);
+                    var finalTotal = originalTotal * 0.7; // 30% off
+                    var totalSavings = originalTotal - finalTotal;
+                    var savingsPercentage = originalTotal > 0 ? (totalSavings / originalTotal) * 100 : 0;
+
+                    await _systemLogger.LogSuccessAsync(
+                        "BLACK_FRIDAY_SALE",
+                        $"Black Friday: {originalTotal:N0} -> {finalTotal:N0} VND",
+                        "Anonymous"
+                    );
+
+                    return Ok(new
+                    {
+                        success = true,
+                        data = new
+                        {
+                            originalTotal = originalTotal,
+                            finalTotal = finalTotal,
+                            totalSavings = totalSavings,
+                            savingsPercentage = Math.Round(savingsPercentage, 2),
+                            message = "Black Friday discount applied"
+                        }
+                    });
+                }
+
+                var simple = ParseSimpleDiscountRequest(request);
+                IPriceCalculator calculator = new BasePriceCalculator(simple.Price, simple.ItemName);
+
                 // Black Friday: 30% off
                 calculator = new PercentageDiscountDecorator(calculator, 30, "Black Friday Sale");
-                
+
                 // Additional member discount if provided
-                if (!string.IsNullOrEmpty(request.MembershipTier))
+                if (!string.IsNullOrEmpty(simple.MembershipTier))
                 {
-                    calculator = new MembershipDiscountDecorator(calculator, request.MembershipTier);
+                    calculator = new MembershipDiscountDecorator(calculator, simple.MembershipTier);
                 }
-                
+
                 // Bulk discount if buying multiple
-                if (request.Quantity > 1)
+                if (simple.Quantity > 1)
                 {
-                    calculator = new BulkPurchaseDiscountDecorator(calculator, request.Quantity);
+                    calculator = new BulkPurchaseDiscountDecorator(calculator, simple.Quantity);
                 }
 
                 var finalPrice = calculator.Calculate();
 
                 await _systemLogger.LogSuccessAsync(
                     "BLACK_FRIDAY_SALE",
-                    $"Black Friday: {request.Price:N0} -> {finalPrice:N0} VND",
-                    request.MembershipTier ?? "Anonymous"
+                    $"Black Friday: {simple.Price:N0} -> {finalPrice:N0} VND",
+                    simple.MembershipTier ?? "Anonymous"
                 );
 
                 return Ok(new
@@ -194,9 +224,9 @@ namespace API_DigiBook.Controllers
                     success = true,
                     data = new
                     {
-                        originalPrice = request.Price,
+                        originalPrice = simple.Price,
                         finalPrice = finalPrice,
-                        discount = request.Price - finalPrice,
+                        discount = simple.Price - finalPrice,
                         description = calculator.GetDescription()
                     }
                 });
@@ -217,10 +247,14 @@ namespace API_DigiBook.Controllers
         /// Validate and apply coupon code
         /// </summary>
         [HttpPost("apply-coupon")]
-        public async Task<IActionResult> ApplyCoupon([FromBody] CouponRequest request)
+        public async Task<IActionResult> ApplyCoupon([FromBody] JsonElement request)
         {
             try
             {
+                var couponCode = ExtractString(request, "code") ?? ExtractString(request, "couponCode") ?? string.Empty;
+                var price = ExtractDouble(request, "price");
+                var itemName = ExtractString(request, "itemName") ?? "Item";
+
                 // Simulate coupon validation (in real app, check database)
                 var couponDiscounts = new Dictionary<string, (double value, bool isPercentage)>
                 {
@@ -230,31 +264,31 @@ namespace API_DigiBook.Controllers
                     { "WELCOME", (15, true) }
                 };
 
-                if (!couponDiscounts.ContainsKey(request.CouponCode.ToUpper()))
+                if (string.IsNullOrWhiteSpace(couponCode) || !couponDiscounts.ContainsKey(couponCode.ToUpper()))
                 {
                     await _systemLogger.LogWarningAsync(
                         "INVALID_COUPON",
-                        $"Invalid coupon code: {request.CouponCode}",
+                        $"Invalid coupon code: {couponCode}",
                         "Anonymous"
                     );
 
                     return BadRequest(new
                     {
                         success = false,
-                        message = $"Invalid coupon code: {request.CouponCode}"
+                        message = $"Invalid coupon code: {couponCode}"
                     });
                 }
 
-                var (value, isPercentage) = couponDiscounts[request.CouponCode.ToUpper()];
+                var (value, isPercentage) = couponDiscounts[couponCode.ToUpper()];
 
-                IPriceCalculator calculator = new BasePriceCalculator(request.Price, request.ItemName);
-                calculator = new CouponDiscountDecorator(calculator, request.CouponCode, value, isPercentage);
+                IPriceCalculator calculator = new BasePriceCalculator(price, itemName);
+                calculator = new CouponDiscountDecorator(calculator, couponCode, value, isPercentage);
 
                 var finalPrice = calculator.Calculate();
 
                 await _systemLogger.LogSuccessAsync(
                     "APPLY_COUPON",
-                    $"Coupon '{request.CouponCode}' applied: {request.Price:N0} -> {finalPrice:N0} VND",
+                    $"Coupon '{couponCode}' applied: {price:N0} -> {finalPrice:N0} VND",
                     "Anonymous"
                 );
 
@@ -264,9 +298,11 @@ namespace API_DigiBook.Controllers
                     message = "Coupon applied successfully",
                     data = new
                     {
-                        originalPrice = request.Price,
+                        valid = true,
+                        discount = price - finalPrice,
                         finalPrice = finalPrice,
-                        discount = request.Price - finalPrice,
+                        message = "Coupon applied successfully",
+                        originalPrice = price,
                         description = calculator.GetDescription()
                     }
                 });
@@ -288,26 +324,37 @@ namespace API_DigiBook.Controllers
         /// Used by DigiBook checkout process
         /// </summary>
         [HttpPost("calculate-checkout")]
-        public async Task<IActionResult> CalculateCheckout([FromBody] CheckoutCalculationRequest request)
+        public async Task<IActionResult> CalculateCheckout([FromBody] JsonElement request)
         {
             try
             {
+                var parsed = ParseCheckoutRequest(request);
+
+                var subtotal = parsed.Subtotal;
+                var shipping = parsed.Shipping;
+                var userId = parsed.UserId;
+                var couponCode = parsed.CouponCode;
+                var applySeasonalDiscount = parsed.ApplySeasonalDiscount;
+
                 // Start with subtotal
-                IPriceCalculator calculator = new BasePriceCalculator(request.Subtotal, "Order");
+                IPriceCalculator calculator = new BasePriceCalculator(subtotal, "Order");
 
                 var appliedDiscounts = new List<object>();
                 var discountBreakdown = new List<string>();
+                double membershipSavings = 0;
+                double couponSavings = 0;
+                double seasonalSavings = 0;
 
                 // 1. Apply Membership Discount (if user is logged in)
-                if (!string.IsNullOrEmpty(request.UserId))
+                if (!string.IsNullOrEmpty(userId))
                 {
-                    var user = await _userRepository.GetByIdAsync(request.UserId);
+                    var user = await _userRepository.GetByIdAsync(userId);
                     if (user != null && !string.IsNullOrEmpty(user.MembershipTier) && user.MembershipTier.ToLower() != "regular")
                     {
                         var beforeMembership = calculator.Calculate();
                         calculator = new MembershipDiscountDecorator(calculator, user.MembershipTier);
                         var afterMembership = calculator.Calculate();
-                        var membershipSavings = beforeMembership - afterMembership;
+                        membershipSavings = beforeMembership - afterMembership;
 
                         appliedDiscounts.Add(new
                         {
@@ -315,14 +362,14 @@ namespace API_DigiBook.Controllers
                             tier = user.MembershipTier,
                             savings = membershipSavings
                         });
-                        discountBreakdown.Add($"Membership ({user.MembershipTier}): -{membershipSavings:N0}đ");
+                        discountBreakdown.Add($"Membership ({user.MembershipTier}): -{membershipSavings:N0}??");
                     }
                 }
 
                 // 2. Apply Coupon Discount (if provided)
-                if (!string.IsNullOrEmpty(request.CouponCode))
+                if (!string.IsNullOrEmpty(couponCode))
                 {
-                    var coupon = await _couponRepository.GetByCodeAsync(request.CouponCode);
+                    var coupon = await _couponRepository.GetByCodeAsync(couponCode);
                     if (coupon != null && coupon.IsActive)
                     {
                         var beforeCoupon = calculator.Calculate();
@@ -333,7 +380,7 @@ namespace API_DigiBook.Controllers
                             coupon.DiscountType == "percentage"
                         );
                         var afterCoupon = calculator.Calculate();
-                        var couponSavings = beforeCoupon - afterCoupon;
+                        couponSavings = beforeCoupon - afterCoupon;
 
                         appliedDiscounts.Add(new
                         {
@@ -343,7 +390,7 @@ namespace API_DigiBook.Controllers
                             discountValue = coupon.DiscountValue,
                             savings = couponSavings
                         });
-                        discountBreakdown.Add($"Coupon ({coupon.Code}): -{couponSavings:N0}đ");
+                        discountBreakdown.Add($"Coupon ({coupon.Code}): -{couponSavings:N0}??");
                     }
                     else
                     {
@@ -356,7 +403,7 @@ namespace API_DigiBook.Controllers
                 }
 
                 // 3. Apply Seasonal/Promotional Discount (if active)
-                if (request.ApplySeasonalDiscount)
+                if (applySeasonalDiscount)
                 {
                     var beforeSeasonal = calculator.Calculate();
                     calculator = new SeasonalDiscountDecorator(
@@ -367,7 +414,7 @@ namespace API_DigiBook.Controllers
                         DateTime.Now.AddDays(7)
                     );
                     var afterSeasonal = calculator.Calculate();
-                    var seasonalSavings = beforeSeasonal - afterSeasonal;
+                    seasonalSavings = beforeSeasonal - afterSeasonal;
 
                     if (seasonalSavings > 0)
                     {
@@ -377,19 +424,19 @@ namespace API_DigiBook.Controllers
                             name = "Spring Sale",
                             savings = seasonalSavings
                         });
-                        discountBreakdown.Add($"Spring Sale: -{seasonalSavings:N0}đ");
+                        discountBreakdown.Add($"Spring Sale: -{seasonalSavings:N0}??");
                     }
                 }
 
                 // Calculate final total
                 var finalSubtotal = calculator.Calculate();
-                var totalSavings = request.Subtotal - finalSubtotal;
-                var finalTotal = finalSubtotal + request.Shipping;
+                var totalSavings = subtotal - finalSubtotal;
+                var finalTotal = finalSubtotal + shipping;
 
                 await _systemLogger.LogSuccessAsync(
                     "CHECKOUT_CALCULATION",
-                    $"Checkout calculated: {request.Subtotal:N0} -> {finalTotal:N0} VND ({appliedDiscounts.Count} discounts)",
-                    request.UserId ?? "Anonymous"
+                    $"Checkout calculated: {subtotal:N0} -> {finalTotal:N0} VND ({appliedDiscounts.Count} discounts)",
+                    userId ?? "Anonymous"
                 );
 
                 return Ok(new
@@ -397,14 +444,12 @@ namespace API_DigiBook.Controllers
                     success = true,
                     data = new
                     {
-                        subtotal = request.Subtotal,
-                        shipping = request.Shipping,
-                        discountedSubtotal = finalSubtotal,
-                        totalSavings = totalSavings,
-                        finalTotal = finalTotal,
-                        appliedDiscounts = appliedDiscounts,
-                        discountBreakdown = discountBreakdown,
-                        description = calculator.GetDescription()
+                        subtotal = subtotal,
+                        membershipDiscount = membershipSavings,
+                        couponDiscount = couponSavings,
+                        seasonalDiscount = seasonalSavings,
+                        total = finalTotal,
+                        discountsApplied = discountBreakdown
                     }
                 });
             }
@@ -418,6 +463,155 @@ namespace API_DigiBook.Controllers
                     error = ex.Message
                 });
             }
+        }
+
+        private static SimpleDiscountRequest ParseSimpleDiscountRequest(JsonElement element)
+        {
+            var result = new SimpleDiscountRequest();
+
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return result;
+            }
+
+            if (element.TryGetProperty("price", out var priceElement) && priceElement.TryGetDouble(out var price))
+            {
+                result.Price = price;
+            }
+
+            if (element.TryGetProperty("itemName", out var itemNameElement) && itemNameElement.ValueKind == JsonValueKind.String)
+            {
+                result.ItemName = itemNameElement.GetString() ?? result.ItemName;
+            }
+
+            if (element.TryGetProperty("quantity", out var quantityElement) && quantityElement.TryGetInt32(out var quantity))
+            {
+                result.Quantity = quantity;
+            }
+
+            if (element.TryGetProperty("membershipTier", out var tierElement) && tierElement.ValueKind == JsonValueKind.String)
+            {
+                result.MembershipTier = tierElement.GetString();
+            }
+
+            return result;
+        }
+
+        private static List<BlackFridayItem> ParseBlackFridayItems(JsonElement itemsElement)
+        {
+            var items = new List<BlackFridayItem>();
+            if (itemsElement.ValueKind != JsonValueKind.Array)
+            {
+                return items;
+            }
+
+            foreach (var item in itemsElement.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var name = ExtractString(item, "name") ?? "Item";
+                var price = ExtractDouble(item, "price");
+                var quantity = ExtractInt(item, "quantity", 1);
+
+                items.Add(new BlackFridayItem
+                {
+                    Name = name,
+                    Price = price,
+                    Quantity = quantity
+                });
+            }
+
+            return items;
+        }
+
+        private static CheckoutCalculationRequest ParseCheckoutRequest(JsonElement element)
+        {
+            var request = new CheckoutCalculationRequest
+            {
+                ApplySeasonalDiscount = false
+            };
+
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return request;
+            }
+
+            request.UserId = ExtractString(element, "userId");
+            request.CouponCode = ExtractString(element, "couponCode");
+
+            if (element.TryGetProperty("applySeasonalDiscount", out var seasonalElement) &&
+                seasonalElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                request.ApplySeasonalDiscount = seasonalElement.GetBoolean();
+            }
+
+            if (element.TryGetProperty("subtotal", out var subtotalElement) && subtotalElement.TryGetDouble(out var subtotal))
+            {
+                request.Subtotal = subtotal;
+            }
+
+            if (element.TryGetProperty("shipping", out var shippingElement) && shippingElement.TryGetDouble(out var shipping))
+            {
+                request.Shipping = shipping;
+            }
+
+            if (element.TryGetProperty("items", out var itemsElement) && itemsElement.ValueKind == JsonValueKind.Array)
+            {
+                var items = itemsElement.EnumerateArray()
+                    .Where(x => x.ValueKind == JsonValueKind.Object)
+                    .Select(x => new
+                    {
+                        Quantity = ExtractInt(x, "quantity", 1),
+                        BasePrice = ExtractDouble(x, "basePrice")
+                    })
+                    .ToList();
+
+                var computedSubtotal = items.Sum(i => i.BasePrice * i.Quantity);
+                request.Subtotal = computedSubtotal;
+                request.Shipping = computedSubtotal > 500000 ? 0 : 25000;
+            }
+
+            return request;
+        }
+
+        private static string? ExtractString(JsonElement element, string propertyName)
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty(propertyName, out var value) &&
+                value.ValueKind == JsonValueKind.String)
+            {
+                return value.GetString();
+            }
+
+            return null;
+        }
+
+        private static double ExtractDouble(JsonElement element, string propertyName)
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty(propertyName, out var value) &&
+                value.ValueKind == JsonValueKind.Number)
+            {
+                return value.GetDouble();
+            }
+
+            return 0;
+        }
+
+        private static int ExtractInt(JsonElement element, string propertyName, int fallback = 0)
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty(propertyName, out var value) &&
+                value.ValueKind == JsonValueKind.Number &&
+                value.TryGetInt32(out var number))
+            {
+                return number;
+            }
+
+            return fallback;
         }
 
         private IPriceCalculator ApplyDiscount(IPriceCalculator calculator, DiscountItem discount, int quantity)
@@ -482,5 +676,12 @@ namespace API_DigiBook.Controllers
         public double Price { get; set; }
         public string ItemName { get; set; } = "Item";
         public string CouponCode { get; set; } = string.Empty;
+    }
+
+    public class BlackFridayItem
+    {
+        public string Name { get; set; } = "Item";
+        public double Price { get; set; }
+        public int Quantity { get; set; } = 1;
     }
 }

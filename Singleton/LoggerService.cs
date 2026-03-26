@@ -12,7 +12,7 @@ namespace API_DigiBook.Singleton
         private static LoggerService? _instance;
         private static readonly object _lock = new object();
         private readonly FirestoreDb _db;
-        private readonly string _collectionName = "systemLogs";
+        private readonly string _collectionName = "system_logs";
 
         // Private constructor to prevent instantiation
         private LoggerService()

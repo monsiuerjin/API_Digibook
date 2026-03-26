@@ -27,7 +27,7 @@ namespace API_DigiBook.Models
         public string User { get; set; } = "Anonymous";
 
         [FirestoreProperty("metadata")]
-        public Dictionary<string, object> Metadata { get; set; } = new Dictionary<string, object>();
+        public object? Metadata { get; set; }
 
         [FirestoreProperty("createdAt")]
         public Timestamp CreatedAt { get; set; }

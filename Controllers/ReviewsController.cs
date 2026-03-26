@@ -155,7 +155,11 @@ namespace API_DigiBook.Controllers
                 return Ok(new
                 {
                     success = true,
-                    bookId = bookId,
+                    data = new
+                    {
+                        bookId = bookId,
+                        averageRating = avgRating
+                    },
                     averageRating = avgRating
                 });
             }
