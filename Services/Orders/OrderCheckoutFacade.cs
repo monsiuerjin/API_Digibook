@@ -3,6 +3,7 @@ using API_DigiBook.Interfaces.Services;
 using API_DigiBook.Interfaces.Payment;
 using API_DigiBook.Models;
 using API_DigiBook.Commands;
+using API_DigiBook.Interfaces.Commands;
 using API_DigiBook.Commands.Orders;
 using API_DigiBook.Notifications;
 using API_DigiBook.Notifications.Contracts;
@@ -73,7 +74,7 @@ namespace API_DigiBook.Services.Orders
                             Description = $"Thanh toan don hang {createdOrder.Id}",
                             ReturnUrl = $"{baseUrl}/order-success?orderId={createdOrder.Id}",
                             CancelUrl = $"{baseUrl}/cart",
-                            Customer = new Models.Customer
+                            Customer = new Models.CustomerInfo
                             {
                                 Name = createdOrder.Customer.Name,
                                 Email = createdOrder.Customer.Email,

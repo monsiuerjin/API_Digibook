@@ -1,5 +1,7 @@
 using API_DigiBook.Models;
+using API_DigiBook.Notifications.Models;
 using API_DigiBook.Commands;
+using API_DigiBook.Interfaces.Commands;
 
 namespace API_DigiBook.Interfaces.Services
 {
