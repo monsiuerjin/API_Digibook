@@ -176,6 +176,111 @@ namespace API_DigiBook.Controllers
             }
         }
 
+        [HttpGet("related")]
+        public async Task<IActionResult> GetRelatedBooks(
+            [FromQuery] string category, 
+            [FromQuery] string currentBookId, 
+            [FromQuery] string? author = null, 
+            [FromQuery] int limit = 5)
+        {
+            try
+            {
+                var cacheKey = _cache.GetVersionedKey($"books:related:{currentBookId}:{category}:{author}:{limit}");
+                var books = await _cache.GetOrSetAsync(cacheKey, async () => 
+                {
+                    var all = await _bookRepository.GetAllAsync();
+                    var related = all.Where(b => b.Id != currentBookId && 
+                        (string.Equals(b.Category, category, StringComparison.OrdinalIgnoreCase) || 
+                         (!string.IsNullOrEmpty(author) && string.Equals(b.Author, author, StringComparison.OrdinalIgnoreCase))))
+                        .Take(limit)
+                        .ToList();
+                    return related;
+                });
+
+                return Ok(new { success = true, count = books?.Count ?? 0, data = books });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting related books for: {Id}", currentBookId);
+                return StatusCode(500, new { success = false, message = "Error retrieving related books", error = ex.Message });
+            }
+        }
+
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchBooks([FromQuery] string title)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(title)) return BadRequest(new { success = false, message = "Search title is required" });
+                
+                var books = await _bookRepository.SearchByTitleAsync(title);
+                return Ok(new { success = true, count = books.Count(), data = books });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error searching books by title: {Title}", title);
+                return StatusCode(500, new { success = false, message = "Error searching books", error = ex.Message });
+            }
+        }
+
+        [HttpGet("top-rated")]
+        public async Task<IActionResult> GetTopRatedBooks([FromQuery] int count = 10)
+        {
+            try
+            {
+                var cacheKey = _cache.GetVersionedKey($"books:top-rated:{count}");
+                var books = await _cache.GetOrSetAsync(cacheKey, async () => 
+                {
+                    var result = await _bookRepository.GetTopRatedAsync(count);
+                    return result.ToList();
+                });
+
+                return Ok(new { success = true, count = books?.Count ?? 0, data = books });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting top rated books");
+                return StatusCode(500, new { success = false, message = "Error retrieving books", error = ex.Message });
+            }
+        }
+
+        [HttpGet("paginated")]
+        public async Task<IActionResult> GetBooksPaginated(
+            [FromQuery] string? limit = null,
+            [FromQuery] string? offset = null,
+            [FromQuery] string? category = null,
+            [FromQuery] string? sortBy = null)
+        {
+            try
+            {
+                int limitValue = int.TryParse(limit, out var l) && l > 0 ? l : 10;
+                int offsetValue = int.TryParse(offset, out var o) && o >= 0 ? o : 0;
+                var sortValue = sortBy ?? "newest";
+
+                var cacheKey = _cache.GetVersionedKey($"books:paginated:{category ?? "all"}:{sortValue}:{offsetValue}:{limitValue}");
+                var page = await _cache.GetOrSetAsync(cacheKey, async () => 
+                {
+                    var allBooks = await _bookRepository.GetAllAsync();
+                    var filtered = string.IsNullOrWhiteSpace(category) ? allBooks : allBooks.Where(b => string.Equals(b.Category, category, StringComparison.OrdinalIgnoreCase));
+                    var sorted = sortValue switch
+                    {
+                        "price_asc" => filtered.OrderBy(b => b.Price),
+                        "price_desc" => filtered.OrderByDescending(b => b.Price),
+                        "rating" => filtered.OrderByDescending(b => b.Rating),
+                        _ => filtered.OrderByDescending(b => GetTimestampOrMin(b.UpdatedAt, b.CreatedAt))
+                    };
+                    return sorted.Skip(offsetValue).Take(limitValue).ToList();
+                });
+
+                return Ok(new { success = true, count = page?.Count ?? 0, data = page });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting paginated books");
+                return StatusCode(500, new { success = false, message = "Error retrieving books", error = ex.Message });
+            }
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetBookById(string id)
         {
@@ -321,36 +426,6 @@ namespace API_DigiBook.Controllers
             }
         }
 
-        [HttpGet("related")]
-        public async Task<IActionResult> GetRelatedBooks(
-            [FromQuery] string category, 
-            [FromQuery] string currentBookId, 
-            [FromQuery] string? author = null, 
-            [FromQuery] int limit = 5)
-        {
-            try
-            {
-                var cacheKey = _cache.GetVersionedKey($"books:related:{currentBookId}:{category}:{author}:{limit}");
-                var books = await _cache.GetOrSetAsync(cacheKey, async () => 
-                {
-                    var all = await _bookRepository.GetAllAsync();
-                    var related = all.Where(b => b.Id != currentBookId && 
-                        (string.Equals(b.Category, category, StringComparison.OrdinalIgnoreCase) || 
-                         (!string.IsNullOrEmpty(author) && string.Equals(b.Author, author, StringComparison.OrdinalIgnoreCase))))
-                        .Take(limit)
-                        .ToList();
-                    return related;
-                });
-
-                return Ok(new { success = true, count = books?.Count ?? 0, data = books });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting related books for: {Id}", currentBookId);
-                return StatusCode(500, new { success = false, message = "Error retrieving related books", error = ex.Message });
-            }
-        }
-
         [HttpGet("category/{category}")]
         public async Task<IActionResult> GetBooksByCategory(string category)
         {
@@ -372,80 +447,6 @@ namespace API_DigiBook.Controllers
             }
         }
 
-        [HttpGet("search")]
-        public async Task<IActionResult> SearchBooks([FromQuery] string title)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(title)) return BadRequest(new { success = false, message = "Search title is required" });
-                
-                var books = await _bookRepository.SearchByTitleAsync(title);
-                return Ok(new { success = true, count = books.Count(), data = books });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error searching books by title: {Title}", title);
-                return StatusCode(500, new { success = false, message = "Error searching books", error = ex.Message });
-            }
-        }
-
-        [HttpGet("top-rated")]
-        public async Task<IActionResult> GetTopRatedBooks([FromQuery] int count = 10)
-        {
-            try
-            {
-                var cacheKey = _cache.GetVersionedKey($"books:top-rated:{count}");
-                var books = await _cache.GetOrSetAsync(cacheKey, async () => 
-                {
-                    var result = await _bookRepository.GetTopRatedAsync(count);
-                    return result.ToList();
-                });
-
-                return Ok(new { success = true, count = books?.Count ?? 0, data = books });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting top rated books");
-                return StatusCode(500, new { success = false, message = "Error retrieving books", error = ex.Message });
-            }
-        }
-
-        [HttpGet("paginated")]
-        public async Task<IActionResult> GetBooksPaginated(
-            [FromQuery] string? limit = null,
-            [FromQuery] string? offset = null,
-            [FromQuery] string? category = null,
-            [FromQuery] string? sortBy = null)
-        {
-            try
-            {
-                int limitValue = int.TryParse(limit, out var l) && l > 0 ? l : 10;
-                int offsetValue = int.TryParse(offset, out var o) && o >= 0 ? o : 0;
-                var sortValue = sortBy ?? "newest";
-
-                var cacheKey = _cache.GetVersionedKey($"books:paginated:{category ?? "all"}:{sortValue}:{offsetValue}:{limitValue}");
-                var page = await _cache.GetOrSetAsync(cacheKey, async () => 
-                {
-                    var allBooks = await _bookRepository.GetAllAsync();
-                    var filtered = string.IsNullOrWhiteSpace(category) ? allBooks : allBooks.Where(b => string.Equals(b.Category, category, StringComparison.OrdinalIgnoreCase));
-                    var sorted = sortValue switch
-                    {
-                        "price_asc" => filtered.OrderBy(b => b.Price),
-                        "price_desc" => filtered.OrderByDescending(b => b.Price),
-                        "rating" => filtered.OrderByDescending(b => b.Rating),
-                        _ => filtered.OrderByDescending(b => GetTimestampOrMin(b.UpdatedAt, b.CreatedAt))
-                    };
-                    return sorted.Skip(offsetValue).Take(limitValue).ToList();
-                });
-
-                return Ok(new { success = true, count = page?.Count ?? 0, data = page });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting paginated books");
-                return StatusCode(500, new { success = false, message = "Error retrieving books", error = ex.Message });
-            }
-        }
 
         private static List<string> ExtractBookIds(JsonElement body)
         {

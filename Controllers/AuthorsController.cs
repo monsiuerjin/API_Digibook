@@ -63,43 +63,6 @@ namespace API_DigiBook.Controllers
         }
 
         /// <summary>
-        /// Get author by ID
-        /// </summary>
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetAuthorById(string id)
-        {
-            try
-            {
-                var author = await _authorRepository.GetByIdAsync(id);
-
-                if (author == null)
-                {
-                    return NotFound(new
-                    {
-                        success = false,
-                        message = $"Author with ID '{id}' not found"
-                    });
-                }
-
-                return Ok(new
-                {
-                    success = true,
-                    data = author
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting author by ID: {Id}", id);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Error retrieving author",
-                    error = ex.Message
-                });
-            }
-        }
-
-        /// <summary>
         /// Search authors by name
         /// </summary>
         [HttpGet("search")]
@@ -132,6 +95,43 @@ namespace API_DigiBook.Controllers
                 {
                     success = false,
                     message = "Error searching authors",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get author by ID
+        /// </summary>
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetAuthorById(string id)
+        {
+            try
+            {
+                var author = await _authorRepository.GetByIdAsync(id);
+
+                if (author == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = $"Author with ID '{id}' not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = author
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting author by ID: {Id}", id);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Error retrieving author",
                     error = ex.Message
                 });
             }
