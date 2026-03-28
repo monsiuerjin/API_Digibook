@@ -45,7 +45,7 @@ namespace API_DigiBook.Controllers
                 return Ok(new
                 {
                     success = true,
-                    count = coupons.Count,
+                    count = coupons?.Count ?? 0,
                     data = coupons
                 });
             }
@@ -155,7 +155,7 @@ namespace API_DigiBook.Controllers
                 return Ok(new
                 {
                     success = true,
-                    count = coupons.Count,
+                    count = coupons?.Count ?? 0,
                     data = coupons
                 });
             }

@@ -174,7 +174,7 @@ namespace API_DigiBook.Repositories
             }
         }
 
-        public virtual async Task<bool> UpdateFieldsAsync(string id, Dictionary<string, object> updates)
+        public virtual async Task<bool> UpdateFieldsAsync(string id, Dictionary<string, object?> updates)
         {
             try
             {

@@ -31,7 +31,7 @@ namespace API_DigiBook.Interfaces.Repositories
         /// <summary>
         /// Update specific fields
         /// </summary>
-        Task<bool> UpdateFieldsAsync(string id, Dictionary<string, object> updates);
+        Task<bool> UpdateFieldsAsync(string id, Dictionary<string, object?> updates);
 
         /// <summary>
         /// Delete entity

@@ -45,7 +45,7 @@ namespace API_DigiBook.Controllers
                 return Ok(new
                 {
                     success = true,
-                    count = categories.Count,
+                    count = categories?.Count ?? 0,
                     data = categories
                 });
             }

@@ -213,7 +213,7 @@ namespace API_DigiBook.Controllers
                     return BadRequest(new { success = false, message = "Role is required" });
                 }
 
-                var updated = await _userRepository.UpdateFieldsAsync(id, new Dictionary<string, object>
+                var updated = await _userRepository.UpdateFieldsAsync(id, new Dictionary<string, object?>
                 {
                     ["role"] = role,
                     ["updatedAt"] = Timestamp.GetCurrentTimestamp()
@@ -248,7 +248,7 @@ namespace API_DigiBook.Controllers
                     return BadRequest(new { success = false, message = "Status is required" });
                 }
 
-                var updated = await _userRepository.UpdateFieldsAsync(id, new Dictionary<string, object>
+                var updated = await _userRepository.UpdateFieldsAsync(id, new Dictionary<string, object?>
                 {
                     ["status"] = status,
                     ["updatedAt"] = Timestamp.GetCurrentTimestamp()
@@ -447,7 +447,7 @@ namespace API_DigiBook.Controllers
                     return BadRequest(new { success = false, message = "wishlistIds is required" });
                 }
 
-                var updated = await _userRepository.UpdateFieldsAsync(userId, new Dictionary<string, object>
+                var updated = await _userRepository.UpdateFieldsAsync(userId, new Dictionary<string, object?>
                 {
                     ["wishlistIds"] = wishlistIds,
                     ["updatedAt"] = Timestamp.GetCurrentTimestamp()
@@ -468,9 +468,9 @@ namespace API_DigiBook.Controllers
             }
         }
 
-        private static Dictionary<string, object> JsonElementToDictionary(JsonElement element)
+        private static Dictionary<string, object?> JsonElementToDictionary(JsonElement element)
         {
-            var result = new Dictionary<string, object>();
+            var result = new Dictionary<string, object?>();
             if (element.ValueKind != JsonValueKind.Object) return result;
 
             foreach (var property in element.EnumerateObject())

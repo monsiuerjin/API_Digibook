@@ -35,7 +35,7 @@ namespace API_DigiBook.Repositories
 
                 // Sort in memory by createdAt if available, otherwise by date string
                 return orders.OrderByDescending(o => 
-                    o.CreatedAt != null && o.CreatedAt != default(Timestamp) 
+                    !o.CreatedAt.Equals(default(Timestamp)) 
                         ? o.CreatedAt.ToDateTime() 
                         : DateTime.TryParse(o.Date, out var dt) ? dt : DateTime.MinValue
                 ).ToList();

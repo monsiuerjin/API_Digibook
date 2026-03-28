@@ -167,7 +167,7 @@ namespace API_DigiBook.Controllers
                 var cacheKey = _cache.GetVersionedKey($"books:batch:{string.Join(",", bookIds.OrderBy(x => x))}");
                 var books = await _cache.GetOrSetAsync(cacheKey, () => _bookRepository.GetByIdsAsync(bookIds));
 
-                return Ok(new { success = true, count = books.Count(), data = books });
+                return Ok(new { success = true, count = books?.Count() ?? 0, data = books });
             }
             catch (Exception ex)
             {
@@ -462,9 +462,9 @@ namespace API_DigiBook.Controllers
             return ids;
         }
 
-        private static Dictionary<string, object> JsonElementToDictionary(JsonElement element)
+        private static Dictionary<string, object?> JsonElementToDictionary(JsonElement element)
         {
-            var result = new Dictionary<string, object>();
+            var result = new Dictionary<string, object?>();
             if (element.ValueKind != JsonValueKind.Object) return result;
             foreach (var property in element.EnumerateObject())
             {

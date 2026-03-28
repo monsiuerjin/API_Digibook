@@ -49,7 +49,7 @@ namespace API_DigiBook.Commands.Orders
                 }
 
                 // Cancel order
-                var updates = new Dictionary<string, object>
+                var updates = new Dictionary<string, object?>
                 {
                     { "status", "Đã hủy" },
                     { "statusStep", 4 },

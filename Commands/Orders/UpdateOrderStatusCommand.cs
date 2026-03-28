@@ -57,7 +57,7 @@ namespace API_DigiBook.Commands.Orders
                 }
 
                 // Update status
-                var updates = new Dictionary<string, object>
+                var updates = new Dictionary<string, object?>
                 {
                     { "status", _newStatus },
                     { "statusStep", _newStatusStep },

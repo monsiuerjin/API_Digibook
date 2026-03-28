@@ -95,7 +95,7 @@ namespace API_DigiBook.Services.Orders
                             createdOrder.Payment.CheckoutUrl = paymentResponse.CheckoutUrl;
                             createdOrder.Payment.TransactionId = paymentResponse.PaymentLinkId;
                             
-                            var updates = new Dictionary<string, object>
+                            var updates = new Dictionary<string, object?>
                             {
                                 { "payment.checkoutUrl", paymentResponse.CheckoutUrl },
                                 { "payment.transactionId", paymentResponse.PaymentLinkId }
