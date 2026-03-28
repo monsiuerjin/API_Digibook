@@ -157,6 +157,9 @@ namespace API_DigiBook
             app.UseAuthorization();
 
             app.MapControllers();
+            
+            // Health check endpoint for cron-job.org to keep Render alive
+            app.MapGet("/ping", () => Results.Ok("pong"));
 
             Console.WriteLine("🚀 API_DigiBook is running...");
             Console.WriteLine($"📖 Swagger UI: {app.Urls.FirstOrDefault() ?? "http://localhost:5197"}/swagger");
