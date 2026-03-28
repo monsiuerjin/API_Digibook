@@ -27,5 +27,9 @@ EXPOSE 443
 # This makes ASP.NET Core listen to the port provided by Render's $PORT environment variable
 ENV ASPNETCORE_URLS=http://+:${PORT:-80}
 
+# Fix inotify limit error by using polling and disabling reload on change
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
+
 # Entry point for the application
 ENTRYPOINT ["dotnet", "API_DigiBook.dll"]
