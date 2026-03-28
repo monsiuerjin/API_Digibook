@@ -162,7 +162,19 @@ namespace API_DigiBook
             app.MapGet("/ping", () => Results.Ok("pong"));
 
             Console.WriteLine("🚀 API_DigiBook is running...");
-            Console.WriteLine($"📖 Swagger UI: {app.Urls.FirstOrDefault() ?? "http://localhost:5197"}/swagger");
+
+            var externalUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL") 
+                             ?? Environment.GetEnvironmentVariable("API_URL");
+            
+            if (!string.IsNullOrEmpty(externalUrl))
+            {
+                Console.WriteLine($"🌐 Public API URL: {externalUrl}");
+                Console.WriteLine($"📖 Swagger UI: {externalUrl.TrimEnd('/')}/swagger");
+            }
+            else
+            {
+                Console.WriteLine($"📖 Swagger UI: {app.Urls.FirstOrDefault() ?? "http://localhost:5197"}/swagger");
+            }
             
             // Auto-open browser to Swagger (works with dotnet run)
             if (app.Environment.IsDevelopment())
