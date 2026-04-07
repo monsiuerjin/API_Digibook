@@ -51,6 +51,9 @@ namespace API_DigiBook
                     options.JsonSerializerOptions.Converters.Add(new FirestoreTimestampConverter());
                     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
                 });
+
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
             
             // Register Repositories
             builder.Services.AddScoped<API_DigiBook.Interfaces.Repositories.IBookRepository, API_DigiBook.Repositories.BookRepository>();
@@ -134,13 +137,12 @@ namespace API_DigiBook
                     // Fallback for quick troubleshooting when explicit origins are not configured.
                     corsBuilder.SetIsOriginAllowed(_ => true)
                         .AllowAnyMethod()
-                        .AllowAnyHeader();
+                        .AllowAnyHeader()
+                        .AllowCredentials(); // Added to be more flexible
                 });
             });
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
@@ -153,6 +155,23 @@ namespace API_DigiBook
 
             // Use CORS
             app.UseCors(frontendCorsPolicy);
+
+            // Add PNA Support Middleware (Must be after Cors or handle OPTIONS carefully)
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Headers.ContainsKey("Access-Control-Request-Private-Network"))
+                {
+                    context.Response.Headers["Access-Control-Allow-Private-Network"] = "true";
+                }
+
+                await next();
+
+                // Double check it's still there on the response if requested
+                if (context.Request.Headers.ContainsKey("Access-Control-Request-Private-Network"))
+                {
+                    context.Response.Headers["Access-Control-Allow-Private-Network"] = "true";
+                }
+            });
 
             app.UseAuthorization();
 

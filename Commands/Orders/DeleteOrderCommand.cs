@@ -33,12 +33,12 @@ namespace API_DigiBook.Commands.Orders
                     return CommandResult.FailureResult($"Order with ID '{_orderId}' not found");
                 }
 
-                // Validate: Only allow deletion of cancelled orders or processing orders
-                if (order.Status != "Đã hủy" && order.Status != "Đang xử lý")
+                // Validate: Only allow deletion of cancelled orders, processing orders, or pending payment orders
+                if (order.Status != "Đã hủy" && order.Status != "Đang xử lý" && order.Status != "Chờ thanh toán")
                 {
                     return CommandResult.FailureResult(
                         $"Cannot delete order with status '{order.Status}'. " +
-                        "Only 'Đã hủy' or 'Đang xử lý' orders can be deleted."
+                        "Only 'Đã hủy', 'Đang xử lý', or 'Chờ thanh toán' orders can be deleted."
                     );
                 }
 

@@ -73,7 +73,7 @@ namespace API_DigiBook.Services.Orders
                             Amount = createdOrder.Payment.Total,
                             Description = $"Thanh toan don hang {createdOrder.Id}",
                             ReturnUrl = $"{baseUrl}/order-success?orderId={createdOrder.Id}",
-                            CancelUrl = $"{baseUrl}/cart",
+                            CancelUrl = $"{baseUrl}/payment-cancel?orderId={createdOrder.Id}",
                             Customer = new Models.CustomerInfo
                             {
                                 Name = createdOrder.Customer.Name,
