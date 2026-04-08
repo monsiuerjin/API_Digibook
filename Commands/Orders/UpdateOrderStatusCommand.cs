@@ -65,11 +65,15 @@ namespace API_DigiBook.Commands.Orders
                 }
 
                 // Validate status transition using State Pattern
-                // IOrderState currentState = OrderStateFactory.GetState(order.Status);
-                // if (!currentState.CanTransitionTo(_newStatus))
-                // {
-                //     return CommandResult.FailureResult($"Cannot change status from '{order.Status}' to '{_newStatus}'");
-                // }
+                // Chuẩn hóa chuỗi Tiếng Việt về dạng NFC để đảm bảo so sánh chính xác giữa DB và API
+                string currentStatusNormalized = (order.Status ?? string.Empty).Normalize(System.Text.NormalizationForm.FormC);
+                string newStatusNormalized = exactStatus.Normalize(System.Text.NormalizationForm.FormC);
+
+                IOrderState currentState = OrderStateFactory.GetState(currentStatusNormalized);
+                if (!currentState.CanTransitionTo(newStatusNormalized))
+                {
+                    return CommandResult.FailureResult($"Không thể chuyển trạng thái từ '{order.Status}' sang '{exactStatus}' (Sai quy trình nghiệp vụ).");
+                }
 
                 // Update status
                 var updates = new Dictionary<string, object?>

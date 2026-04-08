@@ -26,7 +26,11 @@ namespace API_DigiBook.Repositories
             _logger = logger;
         }
 
-        protected string GetCacheKey(string suffix) => $"{_collectionName}:{suffix}";
+        protected string GetCacheKey(string suffix) 
+        {
+            var baseKey = $"{_collectionName}:{suffix}";
+            return _cache?.GetVersionedKey(baseKey) ?? baseKey;
+        }
 
         public virtual async Task<IEnumerable<T>> GetAllAsync()
         {

@@ -8,7 +8,8 @@ namespace API_DigiBook.States.Orders
         public bool CanTransitionTo(string nextStatus)
         {
             var validTransitions = new[] { "Đã xác nhận", "Đã hủy" };
-            return validTransitions.Contains(nextStatus);
+            string normalizedNext = (nextStatus ?? string.Empty).Normalize(System.Text.NormalizationForm.FormC);
+            return validTransitions.Any(t => t.Normalize(System.Text.NormalizationForm.FormC) == normalizedNext);
         }
 
         public string GetStatusName() => "Đang xử lý";
@@ -19,7 +20,8 @@ namespace API_DigiBook.States.Orders
         public bool CanTransitionTo(string nextStatus)
         {
             var validTransitions = new[] { "Đang đóng gói", "Đang giao", "Đã hủy" };
-            return validTransitions.Contains(nextStatus);
+            string normalizedNext = (nextStatus ?? string.Empty).Normalize(System.Text.NormalizationForm.FormC);
+            return validTransitions.Any(t => t.Normalize(System.Text.NormalizationForm.FormC) == normalizedNext);
         }
 
         public string GetStatusName() => "Đã xác nhận";
@@ -30,7 +32,8 @@ namespace API_DigiBook.States.Orders
         public bool CanTransitionTo(string nextStatus)
         {
             var validTransitions = new[] { "Đang giao", "Đã hủy" };
-            return validTransitions.Contains(nextStatus);
+            string normalizedNext = (nextStatus ?? string.Empty).Normalize(System.Text.NormalizationForm.FormC);
+            return validTransitions.Any(t => t.Normalize(System.Text.NormalizationForm.FormC) == normalizedNext);
         }
 
         public string GetStatusName() => "Đang đóng gói";
@@ -42,7 +45,8 @@ namespace API_DigiBook.States.Orders
         {
             // Now transitioning to "Giao thất bại" instead of "Đã hủy" when failing to deliver
             var validTransitions = new[] { "Đã giao", "Giao thất bại", "Đã hủy" };
-            return validTransitions.Contains(nextStatus);
+            string normalizedNext = (nextStatus ?? string.Empty).Normalize(System.Text.NormalizationForm.FormC);
+            return validTransitions.Any(t => t.Normalize(System.Text.NormalizationForm.FormC) == normalizedNext);
         }
 
         public string GetStatusName() => "Đang giao";

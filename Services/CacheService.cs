@@ -43,10 +43,8 @@ namespace API_DigiBook.Services
 
         public void InvalidateByPrefix(string prefix)
         {
-            // Note: IMemoryCache doesn't natively support removing by prefix
-            // In a real production app, we'd use a custom dictionary to track keys
-            // or use a distributed cache like Redis.
-            // For now, we rely on Version-based invalidation (BumpVersion).
+            // Invalidate all keys by bumping the version for this prefix
+            BumpVersion(prefix);
         }
 
         public string GetVersionedKey(string baseKey)

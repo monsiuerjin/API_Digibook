@@ -10,7 +10,10 @@ namespace API_DigiBook.Factories
     {
         public static IOrderState GetState(string status)
         {
-            return status switch
+            // Normalize status to NFC to ensure consistent matching with hardcoded strings
+            string normalizedStatus = (status ?? string.Empty).Normalize(System.Text.NormalizationForm.FormC);
+
+            return normalizedStatus switch
             {
                 "Đang xử lý" => new PendingState(),
                 "Đã xác nhận" => new ConfirmedState(),
